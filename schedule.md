@@ -57,7 +57,7 @@ Assignments (Drills and Homeworks) are **due at 9pm on the day listed**.
 		- Drill 7
 - Week 8
 	- Tue, Mar 18
-		- **MIDTERM**
+		- **MIDTERM** in class
 	- Thu, Mar 20
 		- Homework 5
 		- Drill 8
