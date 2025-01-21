@@ -9,6 +9,7 @@ Assignments (Drills and Homeworks) are **due at 9pm on the day listed**.
 - Week 0
 	- [What is a compiler?](./notes/00-What-Is-A-Compiler.html)
 	- [FP in OCaml §1.1–1.5](https://www.cs.cornell.edu/courses/cs3110/2019sp/textbook/intro/intro.html), [FP in OCaml §2.1–2.21](https://www.cs.cornell.edu/courses/cs3110/2019sp/textbook/intro/intro.html)
+	- [Activity 1 - OCaml](./activities/Activity-01.pdf)
 	<!-- - more ocaml -->
 	- Tue, Jan 21
 	- Thu, Jan 23
