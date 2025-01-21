@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>First-class functions</title>
+    <meta name="generator" content="Org mode" />
+    <meta name="author" content="Sarah E. Chasins" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link href="lecture-notes.css" rel="stylesheet" type="text/css" />
+    <script type="text/javascript">
+      // @license magnet:?xt=urn:btih:e95b018ef3580986a04669f1b5879592219e2a7a&dn=public-domain.txt Public Domain
+      <!--/*--><![CDATA[/*><!--*/
+      function CodeHighlightOn(elem, id) {
+        var target = document.getElementById(id);
+        if (null != target) {
+          elem.classList.add("code-highlighted");
+          target.classList.add("code-highlighted");
+        }
+      }
+      function CodeHighlightOff(elem, id) {
+        var target = document.getElementById(id);
+        if (null != target) {
+          elem.classList.remove("code-highlighted");
+          target.classList.remove("code-highlighted");
+        }
+      }
+      /*]]>*/ //-->
+      // @license-end
+    </script>
+  </head>
+  <body>
+    <div id="preamble" class="status">
+      <div class="alert">
+        <span class="bold">Important:</span> These notes are not designed to
+        subsitute for class sessions. Importantly, they do
+        <span class="ital">not</span> cover all content required for the exams
+        or for implementing HWs. These are just an aid for re-implementing the
+        class compiler, after you've already come to class and completed the
+        in-class activities!
+      </div>
+    </div>
+    <div id="content">
+      <header>
+        <h1 class="title">First-class functions</h1>
+      </header>
+      <nav id="table-of-contents">
+        <h2>Table of Contents</h2>
+        <div id="text-table-of-contents">
+          <ul>
+            <li><a href="#org3f55f21">Extending the AST</a></li>
+            <li><a href="#org1186028">Extending the interpreter</a></li>
+            <li><a href="#org462d7e1">Extending the compiler</a></li>
+          </ul>
+        </div>
+      </nav>
+      <p>
+        Most functional programming languages (really, most modern programming
+        languages of all stripes) support some form of
+        <i>first-class functions</i>. Right now, functions in our language are
+        totally separate from values. We can define them and call them, but we
+        can&rsquo;t:
+      </p>
+
+      <ul class="org-ul">
+        <li>Put a function in a variable</li>
+        <li>Return a function from a function</li>
+        <li>Pass a function to a function as an argument</li>
+      </ul>
+
+      <p>
+        Here are some programs, written in a slightly extended version of our
+        language, that use first-class functions:
+      </p>
+
+      <div class="org-src-container">
+        <pre class="src src-scheme">
+(define (f g) (g 2))
+(define (mul2 x) (+ x x))
+(print (f mul2))
+
+
+
+(define (f g) (g 2))
+(print (f (lambda (x) (+ x x))))
+
+
+(define (f g) (g 2))
+(let ((y 3)) (print (f (lambda (x) (+ x y)))))
+</pre
+        >
+      </div>
+
+      <p>
+        Today we&rsquo;ll add support for the feature you see in the first
+        program&#x2013; we&rsquo;ll be able to pass functions around like other
+        values. Next time we&rsquo;ll add the features we need to support the
+        second two programs. Notice what&rsquo;s different about programs two
+        and three. In the second, we&rsquo;re making an anoymous function,
+        <code>(lambda (x) (+ x x))</code>. In the third, we&rsquo;re making an
+        anonymous function that references a variable
+        <code>y</code> that&rsquo;s let bound outside of the function. We could
+        jump all the way to supporting all three of these programs, but this is
+        actually pretty advanced stuff! Most undergrad compilers classes never
+        get around to supporting language features like first-class functions.
+        So we&rsquo;ll break it down into stages.
+      </p>
+
+      <p>
+        Q: Before you scroll down, take a moment to think about this question.
+        Will we need to change our AST in order to support this change to our
+        language? If yes, how?
+      </p>
+
+      <div id="outline-container-org3f55f21" class="outline-2">
+        <h2 id="org3f55f21">Extending the AST</h2>
+        <div class="outline-text-2" id="text-org3f55f21">
+          <p>
+            Now that we have an AST for our language, we&rsquo;ll need to extend
+            it in order to support calling function values that aren&rsquo;t
+            literal function names. The change is pretty minor.
+          </p>
+
+          <p>
+            Before, the AST constructor for calls looked like this:
+            <code>Call of string * expr list</code>
+          </p>
+
+          <p>Now we&rsquo;ll use the version that appears below:</p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 1: </span
+              ><code>ast.ml</code></label
+            >
+            <pre class="src src-ocaml">
+type expr =
+  | Prim0 of prim0
+  | Prim1 of prim1 * expr
+  | Prim2 of prim2 * expr * expr
+  | Let of string * expr * expr
+  | If of expr * expr * expr
+  | Do of expr list
+  | Num of int
+  | Var of string
+  | Call of expr * expr list
+  | True
+  | False
+</pre
+            >
+          </div>
+
+          <p>
+            We&rsquo;ll also want to make a change to our helper function that
+            translates S-expression ASTs into ASTs for our language. Before the
+            call case looked like this:
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 2: </span
+              ><code>ast.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let rec expr_of_s_exp : s_exp -&gt; expr = function
+  (* some cases elided ... *)
+  | Lst (Sym f :: args) -&gt;
+       Call (f, List.map expr_of_s_exp args)
+</pre
+            >
+          </div>
+
+          <p>Now we&rsquo;ll want it to look like this:</p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 3: </span
+              ><code>ast.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let rec expr_of_s_exp : s_exp -&gt; expr = function
+  (* some cases elided ... *)
+  | Lst (f :: args) -&gt;
+       Call (expr_of_s_exp f, List.map expr_of_s_exp args)
+</pre
+            >
+          </div>
+
+          <p>
+            Notice that <code>f</code> is no longer a
+            <code>Sym</code>&#x2014;instead it&rsquo;s an <code>s_exp</code>. So
+            we also have to make a recursive call to
+            <code>expr_of_s_exp</code> in order to get the appropriate
+            representation of <code>f</code> into our AST.
+          </p>
+        </div>
+      </div>
+
+      <div id="outline-container-org1186028" class="outline-2">
+        <h2 id="org1186028">Extending the interpreter</h2>
+        <div class="outline-text-2" id="text-org1186028">
+          <p>
+            Now we&rsquo;re ready to extend the interpreter. Consider our
+            current value type:
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 4: </span
+              ><code>interp.ml</code></label
+            >
+            <pre class="src src-ocaml">
+ type value =
+| Number of int
+| Boolean of bool
+| Pair of (value * value)
+</pre
+            >
+          </div>
+
+          <p>
+            Q: What will we need to add, if anything, to our value type in order
+            to support first-class functions?
+          </p>
+
+          <p>
+            You could consider a couple options. We could add
+            <code>Function of string list * expr</code>, and then our function
+            values could carry around all the same information that our
+            <code>defn</code> type carries around. Any time we encounter a given
+            function value in a call, we could go ahead and do the same thing we
+            do when we&rsquo;ve looked a funtion up (by name) in our list of
+            <code>defns</code>. (Evaluate the arguments, make a new symbol table
+            based on those arguments, then evaluate the body with the new symbol
+            table.) We&rsquo;d just be skipping over the part where we look it
+            up in <code>defns</code>.
+          </p>
+
+          <p>
+            We could add <code>Function of (value list -&gt; value)</code>.
+            We&rsquo;ve had great luck in the past with building on top of
+            OCaml&rsquo;s own features when we want to implement features in the
+            interpreter. Why not use OCaml functions to implement functions in
+            our language?
+          </p>
+
+          <p>
+            We&rsquo;re going to pick an alternative that will make the
+            structure of the interpreter match a bit more closely with the
+            structure of the compiler. But that doesn&rsquo;t mean those other
+            options are bad! We&rsquo;re just picking one of many reasonable
+            ways to implement this. We&rsquo;ll add
+            <code>Function of string</code>.
+          </p>
+
+          <p>
+            Q: How is this going to be enough information for us to implement
+            first-class functions?
+          </p>
+
+          <p>
+            This is going to be enough information becuase we&rsquo;ll just use
+            this string to look up the appropriate definition in our list of
+            <code>defns</code>! Even though we&rsquo;re no longer demanding a
+            literal function name in the first position in every
+            <code>Call</code> S-expression, we haven&rsquo;t introduced
+            anonymous functions yet. So we can go ahead and evaluate the
+            S-expression in the first position, figure out what name literal we
+            originally gave the function in our definitions block, and that will
+            be enough information for us to retrieve the definition when we need
+            to use it.
+          </p>
+
+          <p>Here&rsquo;s how it&rsquo;ll look in context:</p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 5: </span
+              ><code>interp.ml</code></label
+            >
+            <pre class="src src-ocaml">
+ #+begin_src ocaml
+ type value =
+| Number of int
+| Boolean of bool
+| Pair of (value * value)
+| Function of string
+</pre
+            >
+          </div>
+
+          <p>Let&rsquo;s also make sure we can print out function values:</p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 6: </span
+              ><code>interp.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let rec string_of_value (v : value) : string =
+  (* some cases elided ... *)
+  | Function name -&gt;
+      "&lt;function&gt;"
+</pre
+            >
+          </div>
+
+          <p>
+            Let&rsquo;s go ahead and think about how our <code>Call</code> case
+            should change.
+          </p>
+
+          <p>Here&rsquo;s where we&rsquo;re starting:</p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 7: </span
+              ><code>interp.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let rec interp_exp (defns : defn list) (env : value symtab) (exp : expr) : value
+    =
+  match exp with
+  (* some cases elided ... *)
+   | Call (f, args) when is_defn defns f -&gt;
+       let defn = get_defn defns f in
+       if List.length args = List.length defn.args then
+	 let vals = args |&gt; List.map (interp_exp defns env) in
+	 let fenv = List.combine defn.args vals |&gt; Symtab.of_list in
+	 interp_exp defns fenv defn.body
+       else raise (BadExpression exp)
+   | Call _ -&gt;
+       raise (BadExpression exp)
+</pre
+            >
+          </div>
+
+          <p>
+            Looks like there are a couple problems for our current purposes.
+            First, now that <code>f</code> might be something other than the
+            function&rsquo;s original name, we can&rsquo;t just check if it
+            shows up in our <code>defns</code> list via <code>is_defn</code>.
+            We&rsquo;d better evaluate it first. Then we can check if it shows
+            up in <code>defns</code>. And of course, once we&rsquo;ve gone ahead
+            and evaluated <code>f</code>, we should make sure it&rsquo;s
+            actually a function value. Once we make these changes, we end up
+            here:
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 8: </span
+              ><code>interp.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let rec interp_exp (defns : defn list) (env : value symtab) (exp : expr) : value
+    =
+  match exp with
+  (* some cases elided ... *)
+  | Call (f, args) -&gt; (
+       let vals = args |&gt; List.map (interp_exp defns env) in
+       let fv = interp_exp defns env f in
+       match fv with
+       | Function name when is_defn defns name -&gt;
+	   let defn = get_defn defns name in
+	   if List.length args = List.length defn.args then
+	     let fenv = List.combine defn.args vals |&gt; Symtab.of_list in
+	     interp_exp defns fenv defn.body
+	   else raise (BadExpression exp)
+       | _ -&gt;
+	   raise (BadExpression exp) )
+</pre
+            >
+          </div>
+
+          <p>
+            Looks good! The only problem is, when will we make one of these
+            <code>Function</code> values in the first place? Nothing in our
+            interpreter actually outputs a <code>Function</code> at this point.
+          </p>
+
+          <p>
+            Q: Given how we&rsquo;ve used function values above, when do we need
+            to produce a function value as the output of our
+            <code>interp_exp</code> function?
+          </p>
+
+          <p>
+            When we use a function by name, it&rsquo;s going to look a lot like
+            using any other variable! But we won&rsquo;t find it in our symbol
+            table. So in addition to our original <code>Var</code> case (see
+            first <code>Var</code> case below), we&rsquo;ll want to add the
+            second <code>Var</code> case in the snippet below.
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 9: </span
+              ><code>interp.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let rec interp_exp (defns : defn list) (env : value symtab) (exp : expr) : value
+    =
+  match exp with
+  (* some cases elided ... *)
+  | Var var when Symtab.mem var env -&gt;
+      Symtab.find var env
+  | Var var when is_defn defns var -&gt;
+      Function var
+</pre
+            >
+          </div>
+
+          <p>
+            This gives us a case for situations where the name
+            <i>isn&rsquo;t</i> in the symbol table but <i>is</i> the name of one
+            of the functions in our definition block. Once we know we&rsquo;re
+            in that case, we can just make a <code>Function</code> value with
+            the original name of the function.
+          </p>
+        </div>
+      </div>
+
+      <div id="outline-container-org462d7e1" class="outline-2">
+        <h2 id="org462d7e1">Extending the compiler</h2>
+        <div class="outline-text-2" id="text-org462d7e1">
+          <p>
+            Now we&rsquo;re ready to extend the compiler! Let&rsquo;s start by
+            deciding how to represent a function value at run time. As always,
+            we&rsquo;ll need to figure out how to use a 64-bit slot to represent
+            our value. Fortunately, we know that the addresses of the various
+            instructions in our programs are 64 bits! Recall that we&rsquo;re
+            already adding labels immediately before the assembly for all of our
+            functions&#x2014; we use those labels when we <code>Call</code> or
+            <code>Jmp</code> to the functions. We&rsquo;ll go ahead and use the
+            address of a function&rsquo;s assembly code as our way to represent
+            the function at run time. As with our other types, we&rsquo;ll have
+            to tag function values with a special tag that tells us what the
+            type is.
+          </p>
+
+          <p>
+            Let&rsquo;s start with the usual preliminaries. We&rsquo;ll add a
+            <code>fn_tag</code> and a helper function
+            <code>ensure_fn</code> that emits assembly for checking if an
+            operand is a function value.
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 10: </span
+              ><code>compile.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let fn_tag = 0b110
+
+let ensure_fn (op : operand) : directive list =
+  [ Mov (Reg R8, op)
+  ; And (Reg R8, Imm heap_mask)
+  ; Cmp (Reg R8, Imm fn_tag)
+  ; Jnz "error" ]
+</pre
+            >
+          </div>
+
+          <p>
+            But what if the first instruction of a function is at an address
+            that doesn&rsquo;t end with 0b000? To make sure we have those last
+            three bits available for tagging, we&rsquo;ll have to make sure that
+            doesn&rsquo;t happen. We&rsquo;ll go ahead and use the
+            <code>align</code> instruction to keep those last three bits clear.
+          </p>
+
+          <p>Before, <code>compile_defn</code> looked like this:</p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 11: </span
+              ><code>compile.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let compile_defn defns defn =
+  let ftab =
+    defn.args |&gt; List.mapi (fun i arg -&gt; (arg, -8 * (i + 1))) |&gt; Symtab.of_list
+  in
+  [Label (defn_label defn.name)]
+  @ compile_exp defns ftab (-8 * (List.length defn.args + 1)) defn.body true
+  @ [Ret]
+</pre
+            >
+          </div>
+
+          <p>
+            We&rsquo;ll just change that third to last line from
+            <code>[Label (defn_label defn.name)]</code> to
+            <code>[Align 8; Label (defn_label defn.name)]</code>.
+          </p>
+
+          <p>Now it&rsquo;s:</p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 12: </span
+              ><code>compile.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let compile_defn defns defn =
+  let ftab =
+    defn.args |&gt; List.mapi (fun i arg -&gt; (arg, -8 * (i + 1))) |&gt; Symtab.of_list
+  in
+  [Align 8; Label (defn_label defn.name)]
+  @ compile_exp defns ftab (-8 * (List.length defn.args + 1)) defn.body true
+  @ [Ret]
+</pre
+            >
+          </div>
+
+          <p>
+            And of course we need to make some function values in the first
+            place!
+          </p>
+
+          <p>
+            As in the interpreter, we just want to add an additional
+            <code>Var</code> case inside <code>compile_exp</code>:
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 13: </span
+              ><code>compile.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let rec compile_exp (defns : defn list) (tab : int symtab) (stack_index : int)
+    (exp : expr) (is_tail : bool) : directive list =
+  match exp with
+  (* some cases elided ... *)
+
+  | Var var when Symtab.mem var tab -&gt;
+      [Mov (Reg Rax, stack_address (Symtab.find var tab))]
+  | Var var when is_defn defns var -&gt;
+      [ LeaLabel (Reg Rax, defn_label var)
+	; Or (Reg Rax, Imm fn_tag)]
+</pre
+            >
+          </div>
+
+          <p>
+            Notice what we&rsquo;re doing in that second <code>Var</code> case.
+            First we use <code>defn_label var</code> to get the string we use as
+            the label for a function named var. Next we use
+            <code>LeaLabel</code> (which you&rsquo;ve seen on your homeworks) to
+            get the address associated with that label into <code>rax</code>.
+            Finally, we or it with the function tag, <code>fn_tag</code>, to get
+            the final run-time representation of the function value.
+          </p>
+
+          <p>
+            Now all that&rsquo;s left is to actually use some of these function
+            values in some function calls!
+          </p>
+
+          <p>
+            Recall that we have two cases for <code>Call</code>, one for when
+            the call is in tail position and one for when it&rsquo;s not.
+            We&rsquo;ll need to update both, but the updates will be similar.
+          </p>
+
+          <p>
+            First, we&rsquo;ll want to remove the part of the
+            <code>when</code> clause that checks if <code>f</code> appears in
+            our <code>defns</code>. This is the same thing we did in the
+            interpreter. (Remember, even though we&rsquo;re still using the
+            fixed set of definitions in our programs&rsquo; definitions block,
+            we may be using them by a different name! For example, we may be
+            using a definition originally called <code>f</code>, but we may have
+            let bound it to <code>g</code> and called <code>g</code>. So looking
+            for <code>g</code> in our original definitions list won&rsquo;t do
+            us any good.)
+          </p>
+
+          <p>
+            Relatedly, we won&rsquo;t get to do our check for whether the number
+            of arguments matches at compile time anymore. Remember, at compile
+            time, we just don&rsquo;t know which definition we&rsquo;re actually
+            going to be calling. (Is this <code>g</code> thing the function
+            originally called <code>f</code>? The function originally called
+            <code>mul2</code>? Something else?) If we hadn&rsquo;t already done
+            error handling in prior class sessions, this would be a perfect time
+            to learn how to emit assembly that checks for errors! Since we have
+            already done error handling, we&rsquo;ll go ahead and just remove
+            the checks for argument number matches. If we were going to make the
+            compiler properly, we&rsquo;d definitely have to add the assembly
+            that checks for errors at run time!
+          </p>
+
+          <p>
+            Now we&rsquo;re ready to make our big change. For each of the
+            <code>Call</code> cases, we&rsquo;ll add something like this:
+          </p>
+
+          <div class="org-src-container">
+            <pre class="src src-ocaml">
+@ compile_exp defns tab &lt;next stack cell we can use&gt; f false
+@ ensure_fn (Reg Rax)
+@ [Sub (Reg Rax, Imm fn_tag)]
+</pre
+            >
+          </div>
+
+          <p>
+            This snippet first calls <code>compile_exp</code> on the
+            <code>expr</code> that represents our function. The emitted code
+            will put the run-time representation of the function into
+            <code>rax</code>. Next we check that the value in
+            <code>rax</code> is actually a function via <code>ensure_fn</code>.
+            Finally, we strip off the <code>fn_tag</code> so we can use the
+            value in <code>rax</code> as an address. The only thing that will
+            vary in the <code>is_tail</code> and <code>not is_tail</code> cases
+            is what we use for <code>&lt;next stack cell we can use&gt;</code>.
+          </p>
+
+          <p>
+            Our last change is to <code>Call</code> in the
+            <code>not is_tail</code> case and <code>Jmp</code> in the
+            <code>is_tail</code> case. Previously, we used
+            <code>Call (defn_label f)</code>. This ran our OCaml code for
+            transforming from function name <code>f</code> to the string label
+            we use for function <code>f</code>. Now that we may not have the
+            original name for <code>f</code> available in our call (remember
+            again, we may be calling it <code>g</code> or <code>h</code>!),
+            we&rsquo;ll instead want to call whatever address we put into
+            <code>rax</code> when we ran the assembly for evaluating
+            <code>f</code>. So we&rsquo;ll replace
+            <code>Call (defn_label f)</code> with
+            <code>ComputedCall (Reg Rax)</code>. Likewise, in the
+            <code>is_tail</code> case, we&rsquo;ll replace
+            <code>Jmp (defn_label f)</code> with
+            <code>ComputedJmp (Reg Rax)</code>.
+          </p>
+
+          <p>Putting it all together, we get:</p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 14: </span
+              ><code>compile.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let rec compile_exp (defns : defn list) (tab : int symtab) (stack_index : int)
+    (exp : expr) (is_tail : bool) : directive list =
+  match exp with
+  (* some cases elided ... *)
+
+  | Call (f, args) when not is_tail -&gt;
+      let stack_base = align_stack_index (stack_index + 8) in
+      let compiled_args =
+	args
+	|&gt; List.mapi (fun i arg -&gt;
+	       compile_exp defns tab (stack_base - (8 * (i + 2))) arg false
+	       @ [Mov (stack_address (stack_base - (8 * (i + 2))), Reg Rax)])
+	|&gt; List.concat
+      in
+      compiled_args
+      @ compile_exp defns tab
+	  (stack_base - (8 * (List.length args + 2)))
+	  f false
+      @ ensure_fn (Reg Rax)
+      @ [Sub (Reg Rax, Imm fn_tag)]
+      @ [ Add (Reg Rsp, Imm stack_base)
+	; ComputedCall (Reg Rax)
+	; Sub (Reg Rsp, Imm stack_base) ]
+
+  | Call (f, args) when is_tail -&gt;
+      let compiled_args =
+	args
+	|&gt; List.mapi (fun i arg -&gt;
+	       compile_exp defns tab (stack_index - (8 * i)) arg false
+	       @ [Mov (stack_address (stack_index - (8 * i)), Reg Rax)])
+	|&gt; List.concat
+      in
+      let moved_args =
+	args
+	|&gt; List.mapi (fun i _ -&gt;
+	       [ Mov (Reg R8, stack_address (stack_index - (8 * i)))
+	       ; Mov (stack_address ((i + 1) * -8), Reg R8) ])
+	|&gt; List.concat
+      in
+      compiled_args
+      @ compile_exp defns tab (stack_index - (8 * List.length args)) f false
+      @ ensure_fn (Reg Rax)
+      @ [Sub (Reg Rax, Imm fn_tag)]
+      @ moved_args @ [ComputedJmp (Reg Rax)]
+</pre
+            >
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="postamble" class="status">
+      <footer>
+        Content by Doug Woos, with modifications by Sarah E. Chasins<br />Style
+        adapted from
+        <a href="http://taopeng.me/org-notes-style/">org-notes-style</a>
+      </footer>
+    </div>
+  </body>
+</html>

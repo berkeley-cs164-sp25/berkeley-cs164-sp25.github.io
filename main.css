@@ -1,0 +1,372 @@
+/******************************************************************************/
+/* General */
+
+:root {
+  --accent-fg-color: rgba(230, 51, 102, 1);
+  --accent-bg-color: rgba(230, 51, 102, 0.05);
+  --faded-bg-color: #dddddd;
+}
+
+html {
+  border-top: 10px solid var(--accent-fg-color);
+}
+
+body {
+  max-width: 800px;
+  margin: auto;
+  font-family: "Lato", sans-serif;
+  font-size: 18px;
+}
+
+a {
+  color: var(--accent-fg-color);
+  padding: 0px;
+}
+
+a:hover {
+  background-color: var(--accent-bg-color);
+}
+
+b {
+  font-weight: bold;
+}
+
+em {
+  font-weight: bold;
+  color: var(--accent-fg-color);
+}
+
+code {
+  padding: 0px 4px;
+  background-color: rgba(0, 0, 0, 0.075);
+  font-family: monospace;
+  border-radius: 0;
+  border: 1px dotted var(--accent-fg-color);
+}
+
+pre {
+  /* white-space: nowrap; */
+  padding: 10px 10px;
+  margin: 10px 10px;
+  background-color: rgba(0, 0, 0, 0.075);
+  border-radius: 2px;
+  border: 1px dotted var(--accent-fg-color);
+  overflow-x: scroll;
+}
+
+pre code {
+  background: none;
+  padding: 0;
+  border: none;
+}
+
+/******************************************************************************/
+/* Header */
+
+header {
+  padding: 30px 10px;
+}
+
+header h1 {
+  font-weight: bold;
+  font-size: 2em;
+}
+
+header h1 a {
+  all: inherit;
+}
+
+header h1 a:hover {
+  all: inherit;
+  cursor: pointer;
+}
+
+header p {
+  font-size: 1.25em;
+  margin-top: 15px;
+}
+
+.notification {
+  background-color: var(--accent-fg-color);
+  color: #ffffff;
+  text-align: center;
+  margin-bottom: 20px;
+  padding: 20px;
+  border-radius: 2px;
+}
+
+.notification em {
+  color: inherit;
+  text-transform: uppercase;
+}
+
+/******************************************************************************/
+/* Nav */
+
+nav {
+  margin-bottom: 20px;
+  padding: 10px;
+  border-top: 1px dashed var(--faded-bg-color);
+  border-bottom: 1px dashed var(--faded-bg-color);
+}
+
+nav ul {
+  display: flex;
+}
+
+nav li {
+  list-style-type: none;
+  margin-right: 20px;
+}
+
+nav li:nth-last-child(2) {
+  margin-left: auto;
+}
+
+/******************************************************************************/
+/* Content */
+
+main {
+  padding-bottom: 30px;
+  counter-reset: section;
+  line-height: 1.5;
+}
+
+main>* {
+  margin-top: 10px;
+}
+
+/* Headers */
+
+main h1 {
+  font-weight: bold;
+  font-size: 1.75em;
+}
+
+main h2,
+main h3,
+main h4 {
+  font-weight: bold;
+  margin-top: 30px;
+}
+
+main h2::before,
+main h3::before,
+main h4::before {
+  color: var(--accent-fg-color);
+  font-weight: normal;
+  margin-right: 20px;
+}
+
+main h2 {
+  font-size: 1.6em;
+  counter-reset: subsection;
+}
+
+main.numbered h2:not(.unnumbered)::before {
+  counter-increment: section;
+  content: "\00A7" counter(section) ".";
+}
+
+main h3 {
+  font-size: 1.1em;
+  counter-reset: subsubsection;
+}
+
+main.numbered h3::before {
+  counter-increment: subsection;
+  content: "\00A7" counter(section) "." counter(subsection) ".";
+}
+
+main h4 {
+  font-size: 1em;
+}
+
+main.numbered h4::before {
+  counter-increment: subsubsection;
+  content: "\00A7" counter(section) "." counter(subsection) "." counter(subsubsection);
+}
+
+.h2_anchor_link {
+  display: block;
+  padding: 0px;
+}
+
+.h3_anchor_link {
+  font-size: 0.7em;
+  display: block;
+  text-indent: 2em;
+  padding: 0px;
+}
+
+.callout {
+  border: 1px solid var(--accent-fg-color);
+  border-radius: 2px;
+  padding: 10px;
+}
+
+/* Tables */
+
+main table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+main thead tr {
+  background-color: var(--faded-bg-color);
+}
+
+main tbody tr {
+  border: 0px solid var(--faded-bg-color);
+  border-bottom-width: 1px;
+}
+
+main tbody tr:last-child {
+  border-bottom-width: 3px;
+}
+
+main th {
+  vertical-align: middle;
+  text-align: center;
+  font-weight: bold;
+  padding: 5px;
+}
+
+main td {
+  padding: 5px;
+}
+
+/* Lists */
+
+main ul li {
+  list-style-type: disc;
+  margin-left: 30px;
+}
+
+main ol li {
+  list-style-type: decimal;
+  margin-left: 30px;
+}
+
+/******************************************************************************/
+/* Schedule */
+
+.schedule {
+  table-layout: fixed;
+  text-align: center;
+}
+
+/* Column widths */
+
+.schedule .weekday {
+  width: 50px;
+}
+
+.schedule .month {
+  width: 45px;
+}
+
+.schedule .day {
+  width: 40px;
+}
+
+.schedule .lec-number {
+  width: 60px;
+}
+
+.schedule .materials {
+  width: 250px;
+}
+
+.schedule .homework {
+  width: 120px;
+}
+
+.schedule .homework--difficult {
+  position: relative;
+}
+
+.schedule .homework--difficult::after {
+  content: "🚩";
+  position: absolute;
+  right: -16px;
+}
+
+.schedule .drill {
+  width: 90px;
+}
+
+/* Additional styling */
+
+.schedule th span {
+  display: block;
+  font-size: 0.8em;
+  font-weight: normal;
+}
+
+.schedule .start-week {
+  border-top-width: 3px;
+}
+
+/* .materials, but can't style text-align on colgroup */
+.schedule td:nth-child(2) {
+  text-align: left;
+}
+
+.schedule td[colspan] {
+  text-align: center;
+  font-variant: small-caps;
+  font-weight: bold;
+}
+
+/******************************************************************************/
+/* Profiles */
+
+.profiles {
+  margin: 20px 0;
+}
+
+.profile {
+  display: flex;
+  border-top: 1px dashed var(--faded-bg-color);
+  border-bottom: 1px dashed var(--faded-bg-color);
+  padding: 20px;
+}
+
+.profile+.profile {
+  border-top: none;
+}
+
+.profile>div {
+  flex-grow: 1;
+  margin-left: 20px;
+}
+
+.profile>img {
+  border-radius: 10px;
+  max-width: 200px;
+  max-height: 200px;
+}
+
+.profile h1 {
+  font-size: 1.5em;
+  margin: 0;
+}
+
+.profile .info {
+  margin-bottom: 5px;
+}
+
+.profile p:not(.info) {
+  margin-top: 10px;
+}
+
+/******************************************************************************/
+/* Documentation Images */
+.doc-screenshot {
+  display: block;
+  max-width: 100%;
+  margin: 10px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
+    0 4px 6px -4px rgba(0, 0, 0, 0.1);
+}

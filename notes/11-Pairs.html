@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pairs and the heap</title>
+    <meta name="generator" content="Org mode" />
+    <meta name="author" content="Sarah E. Chasins" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link
+      href="https://www.dougwoos.com/assets/lecture-notes.css"
+      rel="stylesheet"
+      type="text/css"
+    />
+    <script type="text/javascript">
+      // @license magnet:?xt=urn:btih:e95b018ef3580986a04669f1b5879592219e2a7a&dn=public-domain.txt Public Domain
+      <!--/*--><![CDATA[/*><!--*/
+      function CodeHighlightOn(elem, id) {
+        var target = document.getElementById(id);
+        if (null != target) {
+          elem.classList.add("code-highlighted");
+          target.classList.add("code-highlighted");
+        }
+      }
+      function CodeHighlightOff(elem, id) {
+        var target = document.getElementById(id);
+        if (null != target) {
+          elem.classList.remove("code-highlighted");
+          target.classList.remove("code-highlighted");
+        }
+      }
+      /*]]>*/ //-->
+      // @license-end
+    </script>
+  </head>
+  <body>
+    <div id="content">
+      <header>
+        <h1 class="title">Pairs and the heap</h1>
+      </header>
+      <nav id="table-of-contents">
+        <h2>Table of Contents</h2>
+        <div id="text-table-of-contents">
+          <ul>
+            <li><a href="#orgca6c943">Pairs in the interpreter</a></li>
+            <li><a href="#org9e51a34">Pairs in the compiler</a></li>
+            <li><a href="#orgdbc2b1f">A note about garbage</a></li>
+          </ul>
+        </div>
+      </nav>
+      <p>
+        Today we&rsquo;ll add a new type to our language: the pair type. A pair,
+        as its name suggests, packages up two values into one value. We can then
+        access the components individually. We&rsquo;ll implement a few
+        operations to work with this new type:
+      </p>
+
+      <ul class="org-ul">
+        <li>
+          <code>(pair e1 e2)</code> makes a new pair out of <code>e1</code> and
+          <code>e2</code>
+        </li>
+        <li>
+          <code>(left e)</code> gets the left component of the pair
+          <code>e</code> evaluates to
+        </li>
+        <li>
+          <code>(right e)</code> gets the right component of the pair
+          <code>e</code> evaluates to
+        </li>
+      </ul>
+
+      <p>
+        This is a simple addition to our language, but it&rsquo;s quite
+        powerful! In Scheme and other Lisp-like languages, the
+        <code>pair</code> operation is often called <code>cons</code> (short for
+        &ldquo;construct&rdquo;) and pairs are called <i>cons-cells</i>. These
+        cons-cells are used to implement complex nested structures like lists
+        and trees. In our language, we could implement a list of values like
+        this:
+      </p>
+
+      <div class="org-src-container">
+        <pre class="src src-lisp">
+(pair 1 (pair 2 (pair 3 false)))
+</pre
+        >
+      </div>
+
+      <p>
+        We can access the first element of the list with <code>left</code> and
+        the rest of the list with <code>right</code>. In Lisp, the
+        <code>left</code> and <code>right</code> operations are called
+        <code>car</code> and <code>cdr</code>; the names refer to assembly
+        instructions on the computer on which Lisp was originally implemented.
+      </p>
+
+      <div id="outline-container-orgca6c943" class="outline-2">
+        <h2 id="orgca6c943">Pairs in the interpreter</h2>
+        <div class="outline-text-2" id="text-orgca6c943">
+          <p>
+            Our implementation of pairs in the interpreter will be
+            straightforward because we&rsquo;ll rely on OCaml&rsquo;s own pair
+            implementation. Pairs are a kind of value, so we&rsquo;ll need to
+            add a constructor to our <code>value</code> type and implement
+            printing:
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 1: </span
+              ><code>interp.ml</code></label
+            >
+            <pre class="src src-ocaml">
+type value = Number of int | Boolean of bool | Pair of (value * value)
+
+let rec string_of_value (v : value) : string =
+  match v with
+  | Number n -&gt;
+      string_of_int n
+  | Boolean b -&gt;
+      if b then "true" else "false"
+  | Pair (v1, v2) -&gt;
+      Printf.sprintf "(pair %s %s)" (string_of_value v1) (string_of_value v2)
+</pre
+            >
+          </div>
+
+          <p>We&rsquo;ll then implement the pair operations:</p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 2: </span
+              ><code>interp.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let rec interp_exp env (exp : s_exp) : value =
+  match exp with
+  | Lst [Sym "pair"; e1; e2] -&gt;
+      Pair (interp_exp env e1, interp_exp env e2)
+  | Lst [Sym "left"; e] -&gt; (
+    match interp_exp env e with
+    | Pair (v, _) -&gt;
+	v
+    | _ -&gt;
+	raise (BadExpression exp) )
+  | Lst [Sym "right"; e] -&gt; (
+    match interp_exp env e with
+    | Pair (_, v) -&gt;
+	v
+    | _ -&gt;
+	raise (BadExpression exp) )
+</pre
+            >
+          </div>
+        </div>
+      </div>
+
+      <div id="outline-container-org9e51a34" class="outline-2">
+        <h2 id="org9e51a34">Pairs in the compiler</h2>
+        <div class="outline-text-2" id="text-org9e51a34">
+          <p>
+            OK, so now we&rsquo;ve got a value which is actually a pair of
+            values. This is going to be a bit tricky to implement in the
+            compiler&#x2013;remember, all of our values have to fit in a 64-bit
+            register! And since our other values are 64 bits long, it&rsquo;s
+            going to be hard to fit two of them in 64 bits.
+          </p>
+
+          <p>
+            My undergrad advisor,
+            <a href="https://www.cs.swarthmore.edu/~newhall/">Tia Newhall</a>,
+            frequently quoted the
+            <a
+              href="https://en.wikipedia.org/wiki/Fundamental_theorem_of_software_engineering"
+              >Fundamental theorem of software engineering</a
+            >
+            (&ldquo;We can solve any problem by introducing an extra level of
+            indirection.&rdquo;) to explain how systems adapt to this kind of
+            challenge. What if we added a level of indirection? Instead of
+            trying to store a pair in a register, can we store the address of a
+            memory location that stores a pair?
+          </p>
+
+          <p>
+            We&rsquo;ve seen how to write to a section of memory called the
+            stack; we&rsquo;ve used it to store the values of variables, as well
+            as temporary values used during computation. Can we put pairs on the
+            stack?
+          </p>
+
+          <p>
+            If we try to do that, we&rsquo;re going to run into some trouble.
+            Consider our let expression:
+          </p>
+
+          <div class="org-src-container">
+            <pre class="src src-lisp">
+(let ((x &lt;expr)) &lt;body&gt;) 
+</pre
+            >
+          </div>
+
+          <p>
+            Right now, regardless of what <code>expr</code> is, we can compile
+            the <code>let</code> by moving the value in <code>rax</code> (i.e.,
+            the value of <code>expr</code>) to the next available stack address.
+            So how should we compile this expression?
+          </p>
+
+          <div class="org-src-container">
+            <pre class="src src-lisp">
+(let ((x (pair 1 2))) (left x))
+</pre
+            >
+          </div>
+
+          <p>
+            If that pair lives on the stack, we have to put
+            <code>x</code> somewhere else! We&rsquo;d need to somehow track how
+            much stack space the expression used, and put <code>x</code> after
+            it. What about an expression like
+          </p>
+
+          <div class="org-src-container">
+            <pre class="src src-lisp">
+(let ((x (if (&lt; 1 2) (pair 1 (pair 2 3)) (pair 1 2))) (left x))
+</pre
+            >
+          </div>
+
+          <p>
+            How much stack space will we use for the let? At compile-time, we
+            really don&rsquo;t know.
+          </p>
+
+          <p>
+            We need to put that pair someplace where the
+            <code>let</code> won&rsquo;t clobber it. If the stack is for
+            &ldquo;short-lived&rdquo; values whose size is known at
+            compile-time, we need somewhere to put longer-lived values whose
+            size might only be known at run-time.
+          </p>
+
+          <p>
+            This other area of memory is called the heap. The heap is where
+            objects live in Python and Java. It&rsquo;s where OCaml puts complex
+            objects (including pairs). In C, we can allocate space on the heap
+            with the <code>malloc</code> call.
+          </p>
+
+          <p>
+            Just as the stack traditionally &ldquo;grows&rdquo; from higher to
+            lower addresses, the heap will grow from <i>lower</i> addresses to
+            <i>higher</i> addresses. Just as our program starts with the address
+            of the bottom of the stack in the <code>rsp</code> register, it will
+            start with the bottom of the heap in the <code>rdi</code> register
+            (we&rsquo;ll see how we can make that happen in the runtime
+            momentarily). We keep track of indexes into the stack at
+            compile-time; the <code>rsp</code> register never changes. As we saw
+            above, though, we won&rsquo;t be able to do that for the heap: at
+            compile-time, we don&rsquo;t actually know how much heap space
+            we&rsquo;ll use. So we&rsquo;ll need to increment the
+            <code>rdi</code> register as our program executes in order to make
+            sure it always points at the next available chunk of heap memory.
+          </p>
+
+          <p>
+            Let&rsquo;s see how that works by implementing the
+            <code>pair</code> operation:
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 3: </span
+              ><code>compile.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let rec compile_exp (tab : int symtab) (stack_index : int) (exp : s_exp) :
+    directive list =
+  match exp with
+  | Lst [Sym "pair"; e1; e2] -&gt;
+      compile_exp tab stack_index e1
+      @ [Mov (stack_address stack_index, Reg Rax)]
+      @ compile_exp tab (stack_index - 8) e2
+      @ [ Mov (Reg R8, stack_address stack_index)
+	; Mov (MemOffset (Reg Rdi, Imm 0), Reg R8)
+	; Mov (MemOffset (Reg Rdi, Imm 8), Reg Rax)
+	; Mov (Reg Rax, Reg Rdi)
+	; Add (Reg Rdi, Imm 16) ]
+
+</pre
+            >
+          </div>
+
+          <p>
+            All we&rsquo;re doing here is moving the arguments to
+            <code>pair</code> into memory, storing the right address in
+            <code>rax</code>, and making sure <code>rdi</code> still points at
+            the last place in the heap.
+          </p>
+
+          <p>
+            Let&rsquo;s go ahead and implement the runtime now. First,
+            we&rsquo;ll need to make sure
+            <code>rdi</code> points at a region of memory we can write to.
+            We&rsquo;ll do that like this:
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 4: </span
+              ><code>runtime.c</code></label
+            >
+            <pre class="src src-c">
+extern uint64_t entry(void *heap);
+
+// some definitions elided...
+
+int main(int argc, char **argv) {
+  print_value(entry((void*)malloc(4096)));
+  return 0;
+}
+</pre
+            >
+          </div>
+
+          <p>
+            We&rsquo;re allocating 4096 bytes of space to use as our heap, then
+            passing its address into our <code>entry</code> function. In the
+            x86-64 C calling convention, the first argument to a function is
+            passed in the <code>rdi</code> register, so this will do what we
+            want it to!
+          </p>
+
+          <p>
+            Now, let&rsquo;s implement <code>print_value</code> for our pairs.
+            Here we&rsquo;re going to run into some trouble. After all, at
+            runtime a <code>pair</code> value is just a memory address. These
+            addresses are just 64-bit integers! How will we know that
+            we&rsquo;re looking at the address of a pair and not at an integer,
+            or a boolean, or some future other heap-allocated type? We want to
+            tag our pair addresses just like we&rsquo;re tagging our other
+            types. We really can&rsquo;t shift them, though&#x2013;x86-64 might
+            use the whole 64-bit number!
+          </p>
+
+          <p>
+            We&rsquo;re going to use a little trick in order to make this work.
+            All of our values are 64-bit numbers, and we&rsquo;re storing values
+            in memory; so, we&rsquo;ve been modeling memory as an array of
+            8-byte cells. As long as we only ever access memory like this,
+            we&rsquo;ll only ever increment <code>rdi</code> by multiples of 8.
+            So as long as <code>rdi</code> starts out as a multiple of 8, all of
+            our addresses will end in <code>0b000</code>. And, malloc is
+            guaranteed to return a multiple of 8 (actually 16). So, since all of
+            our actual addresses will end in <code>0b000</code>, we can use
+            those last three bits to store a tag.
+          </p>
+
+          <p>
+            This tag can&rsquo;t end in <code>0b00</code>, since that&rsquo;s
+            used by numbers. And it can&rsquo;t end in <code>0b111</code>, since
+            our tags for booleans (and characters, on the homework) end in
+            <code>0b111</code>. All of the other three-bit sequences, however,
+            are fair game! We&rsquo;ll use <code>0b010</code> for pairs.
+            Here&rsquo;s how that looks in the runtime:
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 5: </span
+              ><code>runtime.c</code></label
+            >
+            <pre class="src src-c">
+#define heap_mask 0b111
+#define pair_tag 0b010
+
+void print_value(uint64_t value) {
+  if ((value &amp; num_mask) == num_tag) {
+    int64_t ivalue = (int64_t)value;
+    printf("%" PRIi64, ivalue &gt;&gt; num_shift);
+  } else if ((value &amp; bool_mask) == bool_tag) {
+    if (value &gt;&gt; bool_shift) {
+      printf("true");
+    } else {
+      printf("false");
+    }
+  } else if ((value &amp; heap_mask) == pair_tag) {
+    uint64_t v1 = *(uint64_t*)(value - pair_tag);
+    uint64_t v2 = *(uint64_t*)(value - pair_tag + 8);
+    printf("(pair ");
+    print_value(v1);
+    printf(" ");
+    print_value(v2);
+    printf(")");
+  } 
+  else {
+    printf("BAD %" PRIu64, value);
+  }
+}
+</pre
+            >
+          </div>
+
+          <p>
+            (Remember to recompile the runtime with
+            <code>gcc -c runtime.c -o runtime.o</code>.)
+          </p>
+
+          <p>And in the compiler:</p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 6: </span
+              ><code>compile.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let heap_mask = 0b111
+
+let pair_tag = 0b010
+
+let rec compile_exp (tab : int symtab) (stack_index : int) (exp : s_exp) :
+    directive list =
+  match exp with
+  | Lst [Sym "pair"; e1; e2] -&gt;
+      compile_exp tab stack_index e1
+      @ [Mov (stack_address stack_index, Reg Rax)]
+      @ compile_exp tab (stack_index - 8) e2
+      @ [ Mov (Reg R8, stack_address stack_index)
+	; Mov (MemOffset (Reg Rdi, Imm 0), Reg R8)
+	; Mov (MemOffset (Reg Rdi, Imm 8), Reg Rax)
+	; Mov (Reg Rax, Reg Rdi)
+	; Or (Reg Rax, Imm pair_tag)
+	; Add (Reg Rdi, Imm 16) ]
+</pre
+            >
+          </div>
+
+          <p>
+            Now we can correctly compile and run programs that create pairs:
+          </p>
+
+          <div class="org-src-container">
+            <pre class="src src-ocaml">
+$ compile_and_run "(pair 1 false)";;
+</pre
+            >
+          </div>
+
+          <p>
+            The <code>left</code> and <code>right</code> operations are now
+            straightforward: we just need to remove the pair tag and access the
+            right location in memory.
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 7: </span
+              ><code>compile.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let rec compile_exp (tab : int symtab) (stack_index : int) (exp : s_exp) :
+    directive list =
+  match exp with
+  | Lst [Sym "left"; e] -&gt;
+      compile_exp tab stack_index e
+      @ [Mov (Reg Rax, MemOffset (Reg Rax, Imm (-pair_tag)))]
+  | Lst [Sym "right"; e] -&gt;
+      compile_exp tab stack_index e
+      @ [Mov (Reg Rax, MemOffset (Reg Rax, Imm (-pair_tag + 8)))]
+</pre
+            >
+          </div>
+        </div>
+      </div>
+
+      <div id="outline-container-orgdbc2b1f" class="outline-2">
+        <h2 id="orgdbc2b1f">A note about garbage</h2>
+        <div class="outline-text-2" id="text-orgdbc2b1f">
+          <p>
+            Once we&rsquo;re done with some memory on the stack, we decrement
+            our stack index and keep executing the program, using that memory
+            again if necessary. What happens when we&rsquo;re done with memory
+            on the heap?
+          </p>
+
+          <p>
+            Right now, nothing! We never decrement <code>rdi</code>. For
+            long-running programs, this could be a big problem. We&rsquo;re only
+            allocating 4096 bytes for our heap&#x2013;that could run out!
+          </p>
+
+          <p>
+            Reclaiming unused allocated memory is called
+            <i>garbage collection</i>. Efficiently determining which memory can
+            be safely reclaimed is a tough problem, and fast garbage collection
+            is the subject of ongoing research. For now, we&rsquo;re not going
+            to worry about reclaiming heap space. We&rsquo;ll talk more about
+            garbage collection later in the course.
+          </p>
+        </div>
+      </div>
+    </div>
+    <div id="postamble" class="status">
+      <footer>
+        Content by Doug Woos, with modifications by Sarah E. Chasins<br />Style
+        adapted from
+        <a href="http://taopeng.me/org-notes-style/">org-notes-style</a>
+      </footer>
+    </div>
+  </body>
+</html>

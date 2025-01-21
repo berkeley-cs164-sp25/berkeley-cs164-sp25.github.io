@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Booleans I</title>
+    <meta name="generator" content="Org mode" />
+    <meta name="author" content="S. Chasins" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link
+      href="https://www.dougwoos.com/assets/lecture-notes.css"
+      rel="stylesheet"
+      type="text/css"
+    />
+    <script type="text/javascript">
+      // @license magnet:?xt=urn:btih:e95b018ef3580986a04669f1b5879592219e2a7a&dn=public-domain.txt Public Domain
+      <!--/*--><![CDATA[/*><!--*/
+      function CodeHighlightOn(elem, id) {
+        var target = document.getElementById(id);
+        if (null != target) {
+          elem.classList.add("code-highlighted");
+          target.classList.add("code-highlighted");
+        }
+      }
+      function CodeHighlightOff(elem, id) {
+        var target = document.getElementById(id);
+        if (null != target) {
+          elem.classList.remove("code-highlighted");
+          target.classList.remove("code-highlighted");
+        }
+      }
+      /*]]>*/ //-->
+      // @license-end
+    </script>
+  </head>
+  <body>
+    <div id="content">
+      <header>
+        <h1 class="title">Booleans I</h1>
+      </header>
+      <nav id="table-of-contents">
+        <h2>Table of Contents</h2>
+        <div id="text-table-of-contents">
+          <ul>
+            <li><a href="#orgccc69bd">Types in the interpreter</a></li>
+          </ul>
+        </div>
+      </nav>
+      <p>
+        The next step in growing our language is to add booleans to our
+        interpreter and our compiler. Specifically, we&rsquo;re going to add
+        support for these expressions:
+      </p>
+
+      <ul class="org-ul">
+        <li>
+          <code>true</code> and <code>false</code>, the two boolean values
+        </li>
+        <li>
+          <code>(not e)</code>, a unary operation which evaluates to
+          <code>true</code> on the boolean value <code>false</code> and
+          <code>false</code> otherwise
+        </li>
+        <li>
+          <code>(num? e)</code>, a unary opertion which evaluates to
+          <code>true</code> if <code>e</code> is a number and
+          <code>false</code> otherwise
+        </li>
+        <li>
+          <code>(zero? e)</code>, a unary opertion which evaluates to
+          <code>true</code> if <code>e</code> is the number <code>0</code> and
+          <code>false</code> otherwise
+        </li>
+      </ul>
+
+      <div id="outline-container-orgccc69bd" class="outline-2">
+        <h2 id="orgccc69bd">Types in the interpreter</h2>
+        <div class="outline-text-2" id="text-orgccc69bd">
+          <p>
+            Up until now, our language has supported only one type: numbers.
+            This means that:
+          </p>
+
+          <ul class="org-ul">
+            <li>The values produced by all expressions are numbers</li>
+            <li>The values accepted by all operations are numbers</li>
+          </ul>
+
+          <p>
+            For instance, <code>add1</code> is an operation that takes in a
+            number and produces a number.
+          </p>
+
+          <p>
+            Now we&rsquo;re going to add booleans to our language. This means
+            adding some expressions that produce booleans, and also some
+            operations that accept booleans.
+          </p>
+
+          <p>
+            Here&rsquo;s our <code>interp_exp</code> function from last time:
+          </p>
+
+          <div class="org-src-container">
+            <pre class="src src-ocaml">
+let rec interp_exp (exp : s_exp) : int =
+  match exp with
+  | Num n -&gt; n
+  | Lst [Sym "add1"; arg] -&gt;
+    (interp_exp arg) + 1
+  | Lst [Sym "sub1"; arg] -&gt;
+      (interp_exp arg) - 1
+  | _ -&gt; raise (BadExpression exp)
+</pre
+            >
+          </div>
+
+          <p>
+            Since all of the expressions in our language evaluate to integers,
+            <code>interp_exp</code>
+            can return an integer. How will we modify our interpreter to work
+            with booleans?
+          </p>
+
+          <p>
+            One option would be to represent booleans as numbers. For instance,
+            we could decide that <code>true</code> is 1 and
+            <code>false</code> is 0. Then we could implement our operations like
+            this:
+          </p>
+
+          <div class="org-src-container">
+            <pre class="src src-ocaml">
+let rec interp_exp (exp : s_exp) : int =
+  match exp with
+  | Num n -&gt; n
+  | Sym "true" -&gt; 1
+  | Sym "false" -&gt; 0
+  | Lst [Sym "add1"; arg] -&gt;
+    (interp_exp arg) + 1
+  | Lst [Sym "sub1"; arg] -&gt;
+      (interp_exp arg) - 1
+  | Lst [Sym "not"; arg] -&gt;
+      if (interp_exp arg) = 0 then 1 else 0
+  | _ -&gt; raise (BadExpression exp)
+</pre
+            >
+          </div>
+
+          <p>
+            This is a perfectly valid approach&#x2013;it&rsquo;s more or less
+            how C encodes booleans. It&rsquo;s not going to work very well,
+            though, once we have more complex types like strings and lists
+            (though I guess we could use
+            <a href="https://en.wikipedia.org/wiki/G%C3%B6del_numbering"
+              >Gödel numbering</a
+            >
+            if we really had to). We&rsquo;ll also have a hard time correctly
+            implementing our <code>num</code> operator. What should
+            <code>(num true)</code> return?
+          </p>
+
+          <p>
+            Instead of encoding booleans as numbers, we&rsquo;re going to
+            introduce a new type:
+            <code>value</code>. (We&rsquo;ll also take this opportunity to move
+            our interpreter into its own file, <code>interp.ml</code>).
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 1: </span
+              ><code>interp.ml</code></label
+            >
+            <pre class="src src-ocaml">
+open S_exp
+
+type value = Number of int | Boolean of bool
+</pre
+            >
+          </div>
+
+          <p>
+            Our <code>interp_exp</code> function should return this type. First,
+            we&rsquo;ll just modify it to support the same operations it did
+            before:
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 2: </span
+              ><code>interp.ml</code></label
+            >
+            <pre class="src src-ocaml">
+exception BadExpression of s_exp
+
+let rec interp_exp (exp : s_exp) : value =
+  match exp with
+  | Num n -&gt; Number n
+  | Lst [Sym "add1"; arg] as e -&gt; (
+    match interp_exp arg with
+    | Number n -&gt; Number (n + 1)
+    | _ -&gt; raise (BadExpression e) )
+  | Lst [Sym "sub1"; arg] -&gt; (
+    match interp_exp arg with
+    | Number n -&gt; Number (n - 1)
+    | _ -&gt; raise (BadExpression e) )
+  | e -&gt; raise (BadExpression e)
+</pre
+            >
+          </div>
+
+          <p>
+            Notice what we&rsquo;re doing in the <code>add1</code> and
+            <code>sub1</code> cases: if their argument doesn&rsquo;t evaluate to
+            a number, it&rsquo;s not a valid expression. So, for instance,
+            <code>(add1 false)</code> won&rsquo;t evaluate to anything.
+          </p>
+
+          <p>Now we can add booleans:</p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 3: </span
+              ><code>interp.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let rec interp_exp (exp : s_exp) : value =
+  match exp with
+  | Num n -&gt; Number n
+  | Sym "true" -&gt; Boolean true
+  | Sym "false" -&gt; Boolean false
+  | Lst [Sym "add1"; arg] as e -&gt; (
+    match interp_exp arg with
+    | Number n -&gt; Number (n + 1)
+    | _ -&gt; raise (BadExpression e) )
+  | Lst [Sym "sub1"; arg] as e -&gt; (
+    match interp_exp arg with
+    | Number n -&gt; Number (n - 1)
+    | _ -&gt; raise (BadExpression e) )
+  | Lst [Sym "not"; arg] -&gt;
+    if interp_exp arg = Boolean false then Boolean true else Boolean false
+  | Lst [Sym "zero?"; arg] -&gt;
+    if interp_exp arg = (Number 0) then Boolean true else Boolean false
+  | Lst [Sym "num?"; arg] -&gt; (
+    match interp_exp arg with
+    | Number _ -&gt; Boolean true
+    | _ -&gt; Boolean false )
+  | e -&gt; raise (BadExpression e)
+</pre
+            >
+          </div>
+
+          <p>
+            Notice that our new operations can take in arguments of any type.
+            The Lisp-like language we&rsquo;re implementing, like Python or
+            Racket or Javascript, is dynamically typed.
+          </p>
+
+          <p>
+            Finally, we&rsquo;ll patch up our top-level interpreter function:
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 4: </span
+              ><code>interp.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let string_of_value (v : value) : string =
+  match v with
+  | Number n -&gt; string_of_int n
+  | Boolean b -&gt; if b then "true" else "false"
+
+let interp (program : string) : string =
+  parse program |&gt; interp_exp |&gt; string_of_value
+</pre
+            >
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="postamble" class="status">
+      <footer>
+        Content by Doug Woos, with modifications by Sarah E. Chasins<br />Style
+        adapted from
+        <a href="http://taopeng.me/org-notes-style/">org-notes-style</a>
+      </footer>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Interacting with the environment</title>
+    <meta name="generator" content="Org mode" />
+    <meta name="author" content="S. Chasins" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link
+      href="https://www.dougwoos.com/assets/lecture-notes.css"
+      rel="stylesheet"
+      type="text/css"
+    />
+    <script type="text/javascript">
+      // @license magnet:?xt=urn:btih:e95b018ef3580986a04669f1b5879592219e2a7a&dn=public-domain.txt Public Domain
+      <!--/*--><![CDATA[/*><!--*/
+      function CodeHighlightOn(elem, id) {
+        var target = document.getElementById(id);
+        if (null != target) {
+          elem.classList.add("code-highlighted");
+          target.classList.add("code-highlighted");
+        }
+      }
+      function CodeHighlightOff(elem, id) {
+        var target = document.getElementById(id);
+        if (null != target) {
+          elem.classList.remove("code-highlighted");
+          target.classList.remove("code-highlighted");
+        }
+      }
+      /*]]>*/ //-->
+      // @license-end
+    </script>
+  </head>
+  <body>
+    <div id="content">
+      <header>
+        <h1 class="title">Interacting with the environment</h1>
+      </header>
+      <nav id="table-of-contents">
+        <h2>Table of Contents</h2>
+        <div id="text-table-of-contents">
+          <ul>
+            <li><a href="#orgdd22ca6">Adding input to the interpreter</a></li>
+            <li><a href="#org2e109f5">Adding input to the compiler</a></li>
+          </ul>
+        </div>
+      </nav>
+      <p>
+        Up until this point, our compiler has had a curious property.
+        Here&rsquo;s another compiler we could have written for our language:
+      </p>
+
+      <div class="org-src-container">
+        <label class="org-src-name"
+          ><span class="listing-number">Listing 1: </span
+          ><code>compile.ml</code></label
+        >
+        <pre class="src src-ocaml">
+let rec compile_value (stack_index : int) (v : Interp.value) =
+  match v with
+  | Number n -&gt;
+      [Mov (Reg Rax, operand_of_num n)]
+  | Boolean b -&gt;
+      [Mov (Reg Rax, operand_of_bool b)]
+  | Pair (v1, v2) -&gt;
+      compile_value stack_index v1
+      @ [Mov (stack_address stack_index, Reg Rax)]
+      @ compile_value (stack_index - 8) v2
+      @ [ Mov (Reg R8, stack_address stack_index)
+        ; Mov (MemOffset (Reg Rdi, Imm 0), Reg R8)
+        ; Mov (MemOffset (Reg Rdi, Imm 8), Reg Rax)
+        ; Mov (Reg Rax, Reg Rdi)
+        ; Or (Reg Rax, Imm pair_tag)
+        ; Add (Reg Rdi, Imm 16) ]
+
+let compile (program : s_exp) : string =
+  [Global "entry"; Label "entry"]
+  @ compile_value (-8) (Interp.interp_exp Symtab.empty program)
+  @ [Ret]
+  |&gt; List.map string_of_directive
+  |&gt; String.concat "\n"
+</pre
+        >
+      </div>
+
+      <p>
+        (Go ahead and put it into our usual compile.ml file to see that it
+        works.)
+      </p>
+
+      <p>
+        That&rsquo;s quite a bit simpler! It&rsquo;s even a better
+        compiler&#x2013;the programs it outputs are short and execute very
+        efficiently. Given that it has been much easier to write our interpreter
+        than to write our compiler, why not just do this? Why does anyone work
+        on compilers?
+      </p>
+
+      <p>
+        The answer, of course, is that most programs don&rsquo;t just compute
+        the answer to a fixed expression! We usually write programs because we
+        want to do the same operation multiple times on different inputs.
+        However, in our current language, there&rsquo;s no way to get an input
+        from the outside world. Let&rsquo;s fix that now!
+      </p>
+
+      <div id="outline-container-orgdd22ca6" class="outline-2">
+        <h2 id="orgdd22ca6">Adding input to the interpreter</h2>
+        <div class="outline-text-2" id="text-orgdd22ca6">
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 2: </span
+              ><code>interp.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let input_channel = ref stdin
+
+let rec interp_exp env (exp : s_exp) : value =
+  match exp with
+  | Lst [Sym "read-num"] -&gt;
+      Number (input_line !input_channel |&gt; int_of_string)
+  (* ... *)
+</pre
+            >
+          </div>
+
+          <p>
+            Simple enough! We get slightly weird behavior if we do this, though
+            (at least on my machine):
+          </p>
+
+          <div class="org-src-container">
+            <pre class="src src-ocaml">
+&gt; interp "(pair (read-num) (read-num))";;
+1
+2
+(pair 2 1)
+</pre
+            >
+          </div>
+
+          <p>
+            What&rsquo;s going on here? As it turns out, the problem isn&rsquo;t
+            with <code>read-num</code>&#x2013;it&rsquo;s with <code>pair</code>!
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 3: </span
+              ><code>interp.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let rec interp_exp env (exp : s_exp) : value =
+  match exp with
+  (* ... *)
+  | Lst [Sym "pair"; e1; e2] -&gt;
+      Pair (interp_exp env e1, interp_exp env e2)
+  (* ... *)
+</pre
+            >
+          </div>
+
+          <p>
+            We&rsquo;re calling <code>interp_exp</code> twice, and each of those
+            ends up reading input. But it seems like the second one is happening
+            first!
+          </p>
+
+          <p>
+            The order in which OCaml evaluates arguments to functions (in this
+            case, the function that constructs a pair) is actually
+            <i>unspecified</i>: the implementation can evaluate them in whatever
+            order it likes. This often doesn&rsquo;t really matter&#x2013;for
+            pure expressions like most of the ones we&rsquo;ve been dealing
+            with, it doesn&rsquo;t matter when they are evaluated! Now, though,
+            we&rsquo;ve introduced a <i>side-effect</i>: reading input. It
+            really does matter now when those calls to
+            <code>interp_exp</code> get evaluated!
+          </p>
+
+          <p>
+            Our compiler evaluates arguments to binary operations like
+            <code>pair</code> in left to right order. We&rsquo;ll do the same in
+            the interpreter:
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 4: </span
+              ><code>interp.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let rec interp_exp env (exp : s_exp) : value =
+  match exp with
+  (* ... *)
+  | Lst [Sym "pair"; e1; e2] -&gt;
+      let l = interp_exp env e1 in
+      let r = interp_exp env e2 in
+      Pair (l, r)
+  (* ... *)
+
+
+let interp (program : string) : string =
+  interp_exp Symtab.empty (parse program)
+
+</pre
+            >
+          </div>
+        </div>
+      </div>
+
+      <div id="outline-container-org2e109f5" class="outline-2">
+        <h2 id="org2e109f5">Adding input to the compiler</h2>
+        <div class="outline-text-2" id="text-org2e109f5">
+          <p>
+            First, we&rsquo;ll add a function to the C runtime to read a number:
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 5: </span
+              ><code>runtime.c</code></label
+            >
+            <pre class="src src-c">
+uint64_t read_num() {
+  int r;
+  scanf("%d", &amp;r);
+  return (uint64_t)(r) &lt;&lt; num_shift;
+}
+</pre
+            >
+          </div>
+
+          <p>
+            We&rsquo;ll need to let the assembler know that the
+            <code>read_num</code> label is defined in the runtime:
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 6: </span
+              ><code>compile.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let compile (program : s_exp) : string =
+  [ Global "entry"
+  ; Extern "error"
+  ; Extern "read_num"
+  ; Label "entry" ]
+  @ compile_exp Symtab.empty (-8) program
+  @ [Ret]
+  |&gt; List.map string_of_directive
+  |&gt; String.concat "\n"
+
+</pre
+            >
+          </div>
+
+          <p>
+            Now we need to actually compile the <code>(read-num)</code> form
+            into a call to this function. In our error-handling code, we were
+            able to &ldquo;call&rdquo; C functions just by jumping to the right
+            label. Fundamentally that&rsquo;s still what&rsquo;s going to
+            happen, but we&rsquo;re going to need to do some additional work to
+            make sure our program can keep executing after the function call:
+          </p>
+
+          <ul class="org-ul">
+            <li>
+              <code>read_num</code> might use the <code>rdi</code> register
+              where our heap pointer lives. We&rsquo;ll need to save the heap
+              pointer to the stack before <code>read_num</code> starts
+              executing.
+            </li>
+            <li>
+              Speaking of the stack, we&rsquo;ve been writing to stack locations
+              like <code>[rsp - 8]</code>, <code>[rsp - 16]</code>, etc.
+              <code>read_num</code> might also want to write to
+              <code>[rsp - 8]</code>, which will be a problem since we might
+              have data there! The solution is to adjust <code>rsp</code> and
+              restore it after the call.
+            </li>
+            <li>
+              We haven&rsquo;t modified memory at <code>[rsp + 0]</code> because
+              that&rsquo;s where our function&rsquo;s
+              <i>return address</i> is&#x2013;when we call <code>ret</code>, the
+              processor resumes operations at that address. Instead of calling
+              <code>read_num</code> using <code>jmp</code>, we&rsquo;ll use
+              <code>call</code>, which will put the new return address on the
+              top of the stack.
+            </li>
+            <li>
+              Finally: C functions on x86-64 require that when they start
+              executing, <code>rsp</code> (the location of the return address)
+              is a multiple of 16. So, we&rsquo;ll need to further adjust
+              <code>rsp</code> to make sure this property holds.
+            </li>
+          </ul>
+
+          <p>Here&rsquo;s the code we end up with:</p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 7: </span
+              ><code>compile.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let align_stack_index (stack_index : int) : int =
+  if stack_index mod 16 = -8 then stack_index else stack_index - 8
+
+let rec compile_exp (tab : int symtab) (stack_index : int) (exp : s_exp) :
+    directive list =
+  match exp with
+  | Lst [Sym "read-num"] -&gt;
+      [ Mov (stack_address stack_index, Reg Rdi)
+      ; Add (Reg Rsp, Imm (align_stack_index stack_index))
+      ; Call "read_num"
+      ; Sub (Reg Rsp, Imm (align_stack_index stack_index))
+      ; Mov (Reg Rdi, stack_address stack_index) ]
+  (* ... *)
+</pre
+            >
+          </div>
+
+          <p>
+            See the lecture capture for an explanation of why this works,
+            including some worked examples.
+          </p>
+        </div>
+      </div>
+    </div>
+    <div id="postamble" class="status">
+      <footer>
+        Content by Doug Woos, with modifications by Sarah E. Chasins<br />Style
+        adapted from
+        <a href="http://taopeng.me/org-notes-style/">org-notes-style</a>
+      </footer>
+    </div>
+  </body>
+</html>

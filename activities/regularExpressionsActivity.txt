@@ -1,0 +1,86 @@
+lowercase words that start with "a" (hint: use [a-z] for any lowercase letter)
+
+should match: apples | almonds | apricots | avocados |
+should not match: barley | berkeley | aTestStringWithCaps |
+
+-------------------------------------------------------------------------------
+
+lowercase words with at least two "a"s
+
+should match: aardvark | avocados | parallel |
+should not match:  almonds | apricots | caller |
+
+-------------------------------------------------------------------------------
+
+lowercase words with at least two "a"s, but "a"s don't start or end the word
+
+should match: | parallel | calendar |
+should not match: almonds | alabaster | caller | aardvark | avocados | bandana
+
+-------------------------------------------------------------------------------
+
+lowercase words with at least two occurances of letters from the set {"a", "b", "c"}
+
+should match: barley | avocados | tabby | back | apricots 
+should not match: bitter | almonds | oboe |
+
+-------------------------------------------------------------------------------
+
+alternating sequences of "a" and "b" 
+
+should match: ababa | babab | abab | baba | b | a | ba |
+should not match: bbaabbaa | aabab | bbaba | bb | aa | 
+
+-------------------------------------------------------------------------------
+
+email addresses (hint: [A-Z] for any uppercase letter)
+
+should match: hello@hello.com | wowfunactivity@a.b | testWithCaps@gmail.com 
+should not match: test@test@test.com | www.google.com | thisisjustastring 
+
+-------------------------------------------------------------------------------
+
+any number of "a"s followed by the same number of "b"s
+
+should match: aaabbb | ab | aaaaabbbbb | aaabbb |
+should not match: abb | aaab | aaaaabb |
+
+
+
+scroll for spoilers
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+spoiler:
+last task can't be done!

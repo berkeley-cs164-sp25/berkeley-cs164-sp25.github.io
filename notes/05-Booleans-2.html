@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Booleans II</title>
+    <meta name="generator" content="Org mode" />
+    <meta name="author" content="S. Chasins" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link
+      href="https://www.dougwoos.com/assets/lecture-notes.css"
+      rel="stylesheet"
+      type="text/css"
+    />
+    <script type="text/javascript">
+      // @license magnet:?xt=urn:btih:e95b018ef3580986a04669f1b5879592219e2a7a&dn=public-domain.txt Public Domain
+      <!--/*--><![CDATA[/*><!--*/
+      function CodeHighlightOn(elem, id) {
+        var target = document.getElementById(id);
+        if (null != target) {
+          elem.classList.add("code-highlighted");
+          target.classList.add("code-highlighted");
+        }
+      }
+      function CodeHighlightOff(elem, id) {
+        var target = document.getElementById(id);
+        if (null != target) {
+          elem.classList.remove("code-highlighted");
+          target.classList.remove("code-highlighted");
+        }
+      }
+      /*]]>*/ //-->
+      // @license-end
+    </script>
+  </head>
+  <body>
+    <div id="content">
+      <header>
+        <h1 class="title">Booleans II</h1>
+      </header>
+      <nav id="table-of-contents">
+        <h2>Table of Contents</h2>
+        <div id="text-table-of-contents">
+          <ul>
+            <li><a href="#org29d26ae">Types in the compiler</a></li>
+            <li><a href="#org8ec0e1b">Boolean support in the runtime</a></li>
+            <li><a href="#org22776a8">Boolean support in the compiler</a></li>
+          </ul>
+        </div>
+      </nav>
+      <p>
+        Recall that we&rsquo;re adding support for booleans to our interpreter
+        and compiler. Booleans I covered adding them to our interpreter. Now
+        we&rsquo;ll turn to the compiler. Specifically, we&rsquo;re going to add
+        support for these expressions:
+      </p>
+
+      <ul class="org-ul">
+        <li>
+          <code>true</code> and <code>false</code>, the two boolean values
+        </li>
+        <li>
+          <code>(not e)</code>, a unary operation which evaluates to
+          <code>true</code> on the boolean value <code>false</code> and
+          <code>false</code> otherwise
+        </li>
+        <li>
+          <code>(num? e)</code>, a unary opertion which evaluates to
+          <code>true</code> if <code>e</code> is a number and
+          <code>false</code> otherwise
+        </li>
+        <li>
+          <code>(zero? e)</code>, a unary opertion which evaluates to
+          <code>true</code> if <code>e</code> is the number <code>0</code> and
+          <code>false</code> otherwise
+        </li>
+      </ul>
+
+      <div id="outline-container-org29d26ae" class="outline-2">
+        <h2 id="org29d26ae">Types in the compiler</h2>
+        <div class="outline-text-2" id="text-org29d26ae">
+          <p>
+            Now that we have an interpreter to test against, we can extend our
+            compiler to support our new operations!
+          </p>
+
+          <p>
+            When our interpreter is executing a program, values of expressions
+            are instances of the <code>value</code> datatype we just defined. We
+            won&rsquo;t be able to do that in the compiler&#x2013;we can&rsquo;t
+            define new datatypes in x86-64! Remember that when our program is
+            executing, its values live in registers (actually, just
+            <code>rax</code>). Registers store 64-bit integers. Right now the
+            values in our program are all integers, so this works fine. But how
+            will we add booleans? Take a second and think about how you might
+            implement this.
+          </p>
+
+          <p>
+            Well, we know that all of our values need to be represented, at
+            runtime, as 64-bit integers. So instead of representing integers as
+            themselves:
+          </p>
+
+          <div class="org-src-container">
+            <pre class="src src-ocaml">
+0 -&gt; 0b00
+1 -&gt; 0b01
+2 -&gt; 0b10
+3 -&gt; 0b11
+...
+</pre
+            >
+          </div>
+
+          <p>
+            We&rsquo;re going to represent the integer <code>x</code> as
+            <code>x &lt;&lt; 2</code> (shifted left by two bits):
+          </p>
+
+          <div class="org-src-container">
+            <pre class="src src-ocaml">
+0 -&gt; 0b0000
+1 -&gt; 0b0100
+2 -&gt; 0b1000
+3 -&gt; 0b1100
+</pre
+            >
+          </div>
+
+          <p>
+            This is exactly equivalent to representing each integer
+            <code>x</code> as <code>x * 4</code>.
+          </p>
+
+          <p>
+            This means our integers have to fit in 62 bits instead of 64. So our
+            minimum integer is now <code>-(2**61)</code> and our maximum integer
+            is <code>(2**61) - 1</code>.
+          </p>
+
+          <p>
+            This also means there are a bunch of 64-bit integers (how many?)
+            that are no longer being used to represent values! All of our
+            integer values now end with
+            <code>00</code>. So anything that ends with a different pair of bits
+            won&rsquo;t be used to represent a number. This means we can use
+            some of them to represent booleans, and other types!
+          </p>
+
+          <p>
+            First, though, let&rsquo;s update our compiler to use this new
+            representation for integers. Integer constants will be
+            easy&#x2013;we&rsquo;ll just shift them left. How will we handle
+            <code>add1</code> and <code>sub1</code>? Well, remember that our
+            runtime representations are the values multiplied by 4. Since
+            multiplication distributes over addition (and subtraction), we can
+            just add (or subtract) 4 instead of 1! So:
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 1: </span
+              ><code>compiler.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let num_shift = 2
+let num_mask = 0b11
+let num_tag = 0b00
+
+let rec compile_exp (exp : s_exp) : directive list =
+  match exp with
+  | Num n -&gt;
+    [Mov (Reg Rax, Imm (n lsl num_shift))]
+  | Lst [Sym "add1"; arg] -&gt;
+    compile_exp arg @
+    [Add (Reg Rax, Imm (1 lsl num_shift))]
+  | Lst [Sym "sub1"; arg] -&gt;
+    compile_exp arg @
+    [Sub (Reg Rax, Imm (1 lsl num_shift))]
+  | e -&gt; raise (BadExpression e)
+</pre
+            >
+          </div>
+
+          <p>
+            (<code>lsl</code> is &ldquo;logical shift left.&rdquo; We could also
+            just multiply by 4, but it&rsquo;s clearer this way.)
+          </p>
+
+          <p>What happens if we run a program now?</p>
+
+          <div class="org-src-container">
+            <pre class="src src-ocaml">
+&gt;&gt;&gt; compile_and_run "(add1 4)"
+20
+</pre
+            >
+          </div>
+
+          <p>
+            This makes sense&#x2013;we&rsquo;re printing out the runtime
+            representation! We&rsquo;ll need to fix that. We&rsquo;ll edit our C
+            runtime:
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 2: </span
+              ><code>runtime.c</code></label
+            >
+            <pre class="src src-c">
+#include &lt;stdio.h&gt;
+#include &lt;inttypes.h&gt;
+
+#define num_shift 2
+#define num_mask 0b11
+#define num_tag 0b00
+
+extern uint64_t entry();
+
+void print_value(uint64_t value) {
+  if ((value &amp; num_mask) == num_tag) {
+    int64_t ivalue = (int64_t)value;
+    printf("%" PRIi64, ivalue &gt;&gt; num_shift);
+  } else {
+    printf("BAD VALUE %" PRIu64, value);
+  }
+}
+
+int main(int argc, char **argv) {
+  print_value(entry());
+  return 0;
+}
+</pre
+            >
+          </div>
+        </div>
+      </div>
+
+      <div id="outline-container-org8ec0e1b" class="outline-2">
+        <h2 id="org8ec0e1b">Boolean support in the runtime</h2>
+        <div class="outline-text-2" id="text-org8ec0e1b">
+          <p>
+            While we&rsquo;re editing the runtime, let&rsquo;s also add support
+            for booleans.
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 3: </span
+              ><code>runtime.c</code></label
+            >
+            <pre class="src src-c">
+#include &lt;stdio.h&gt;
+#include &lt;inttypes.h&gt;
+
+#define num_shift 2
+#define num_mask  0b11
+#define num_tag   0b00
+
+#define bool_shift 7
+#define bool_mask  0b1111111
+#define bool_tag   0b0011111
+
+extern uint64_t entry();
+
+void print_value(uint64_t value) {
+  if ((value &amp; num_mask) == num_tag) {
+    int64_t ivalue = (int64_t)value;
+    printf("%" PRIi64, ivalue &gt;&gt; num_shift);
+  } else if ((value &amp; bool_mask) == bool_tag) {
+    if (value &gt;&gt; bool_shift) {
+      printf("true");
+    } else {
+      printf("false");
+    }
+  } else {
+    printf("BAD VALUE %" PRIu64, value);
+  }
+}
+
+int main(int argc, char **argv) {
+  print_value(entry());
+  return 0;
+}
+</pre
+            >
+          </div>
+
+          <p>We&rsquo;ll need to recompile the runtime:</p>
+
+          <div class="org-src-container">
+            <pre class="src src-sh">
+$ gcc -c runtime.c -o runtime.o
+</pre
+            >
+          </div>
+        </div>
+      </div>
+
+      <div id="outline-container-org22776a8" class="outline-2">
+        <h2 id="org22776a8">Boolean support in the compiler</h2>
+        <div class="outline-text-2" id="text-org22776a8">
+          <p>
+            We can now add support for <code>true</code> and
+            <code>false</code> pretty easily:
+          </p>
+
+          <div class="org-src-container">
+            <pre class="src src-ocaml">
+let bool_shift = 7
+let bool_mask = 0b1111111
+let bool_tag = 0b0011111
+
+let rec compile_exp (exp : s_exp) : directive list =
+  match exp with
+  (* some cases elided ... *)
+  | Sym "true" -&gt; [Mov (Reg Rax, Imm ((1 lsl bool_shift) lor bool_tag))]
+  | Sym "false" -&gt; [Mov (Reg Rax, Imm ((0 lsl bool_shift) lor bool_tag))]
+</pre
+            >
+          </div>
+
+          <p>
+            Handling our other operations will be a little trickier. Let&rsquo;s
+            start with
+            <code>not</code>. As a reminder, <code>not</code> should evaluate to
+            <code>true</code> (i.e., should put the runtime representation of
+            <code>true</code> into <code>rax</code>!) when its argument is
+            <code>false</code>; otherwise, it should evaluate to
+            <code>false</code>.
+          </p>
+
+          <p>
+            It seems like we need a way to <i>compare</i> the runtime
+            representations of values. For this, we&rsquo;ll use the x86-64
+            instruction <code>cmp</code>. <code>cmp X,Y</code> compares
+            <code>X</code> to <code>Y</code>. It then sets processor
+            <i>flags</i> based on the result. There are a bunch of flags, and
+            we&rsquo;ll talk about more of them later in the class; for now, we
+            just need to know that <code>cmp</code> sets the flag
+            <code>ZF</code> to 1 if its arguments are the same and
+            <code>0</code> otherwise.
+          </p>
+
+          <p>
+            Flags aren&rsquo;t like registers&#x2013;we don&rsquo;t access them
+            directly in assembly code<sup
+              ><a id="fnr.1" class="footref" href="#fn.1">1</a></sup
+            >. These flags then modify the behavior of subsequent instructions.
+            We&rsquo;ll see more examples of this next lecture when we talk
+            about conditionals. For now, we&rsquo;re going to use another
+            instruction, <code>setz</code>, in order to access <code>ZF</code>.
+            <code>setz</code> takes a register<sup
+              ><a id="fnr.2" class="footref" href="#fn.2">2</a></sup
+            >
+            and sets the last byte of that register to 1 (i.e.,
+            <code>0b00000001</code>) if <code>ZF</code> is set and 0 if
+            <code>ZF</code> is not set.
+          </p>
+
+          <p>
+            In pseudo-assembly, how we&rsquo;re going to implement the
+            <code>not</code> operator:
+          </p>
+
+          <div class="org-src-container">
+            <pre class="src src-asm">
+not:    
+        cmp rax, 0b00011111
+        mov rax, 0
+        setz rax        
+        shl rax, 7
+        or rax, 0b0011111
+</pre
+            >
+          </div>
+
+          <p>So, now we can implement <code>not</code>:</p>
+
+          <div class="org-src-container">
+            <pre class="src src-ocaml">
+let bool_shift = 7
+let bool_mask = 0b1111111
+let bool_tag = 0b0011111
+
+let rec compile_exp (exp : s_exp) : directive list =
+  match exp with
+  (* some cases elided ... *)
+  | Sym "true" -&gt; [Mov (Reg Rax, Imm ((1 lsl bool_shift) lor bool_tag))]
+  | Sym "false" -&gt; [Mov (Reg Rax, Imm ((0 lsl bool_shift) lor bool_tag))]
+  | Lst [Sym "not"; arg] -&gt;
+    compile_exp arg @
+    [ Cmp (Reg Rax, Imm ((0 lsl bool_shift) lor bool_tag)) (* compare rax to false *)
+    ; Mov (Reg Rax, Imm 0) (* zero out rax *)
+    ; Setz (Reg Rax) (* 1 if ZF is set (meaning rax contained false), 0 otherwise *)
+    ; Shl (Reg Rax, Imm bool_shift) (* rax &lt;&lt; bool_shift *)
+    ; Or (Reg Rax, Imm bool_tag) (* tag rax as a boolean: rax = rax | bool_tag *)
+    ]
+</pre
+            >
+          </div>
+
+          <p>
+            There&rsquo;s some duplicate logic here. We&rsquo;re going to make a
+            helper function called
+            <code>operand_of_bool</code>, which makes an instruction operand
+            from a boolean using shift and or:
+          </p>
+
+          <div class="org-src-container">
+            <pre class="src src-ocaml">
+let operand_of_bool (b : bool) : operand =
+  Imm (((if b then 1 else 0) lsl bool_shift) lor bool_tag)
+</pre
+            >
+          </div>
+
+          <p>We can do the same thing for numbers:</p>
+
+          <div class="org-src-container">
+            <pre class="src src-ocaml">
+let operand_of_num (x : int) : operand =
+  Imm ((x lsl num_shift) lor num_tag)
+</pre
+            >
+          </div>
+
+          <p>
+            (We include <code>lor num_tag</code> here to be symmetric with
+            <code>operand_to_bool</code>, but everything would work if we left
+            it off&#x2013;why?)
+          </p>
+
+          <p>
+            Lastly, we&rsquo;re going to re-use the code to convert
+            <code>ZF</code> to a boolean:
+          </p>
+
+          <div class="org-src-container">
+            <pre class="src src-ocaml">
+let zf_to_bool: directive list =
+  [Mov (Reg Rax, Imm 0) (* zero out rax *)
+  ; Setz (Reg Rax) (* 1 if ZF is set, 0 otherwise *)
+  ; Shl (Reg Rax, Imm bool_shift) (* rax &lt;&lt; bool_shift *)
+  ; Or (Reg Rax, Imm bool_tag) (* tag rax as a boolean: rax = rax | bool_tag *)
+  ]
+</pre
+            >
+          </div>
+
+          <p>
+            <code>zf_to_bool</code> is a list, not a function. How is that
+            possible? Won&rsquo;t it depend on the value we&rsquo;re trying to
+            convert? It does not! This is a list of <b>instructions</b> that set
+            <code>rax</code> to the runtime representation of
+            <code>true</code> if <code>ZF</code> is set and to the runtime
+            representation of <code>false</code> otherwise.
+          </p>
+
+          <p>Now we can implement <code>zero?</code> easily:</p>
+
+          <div class="org-src-container">
+            <pre class="src src-ocaml">
+let rec compile_exp (exp : s_exp) : directive list =
+  match exp with
+  (* some cases elided ... *)
+  | Sym "true" -&gt; [Mov (Reg Rax, operand_of_bool true)]
+  | Sym "false" -&gt; [Mov (Reg Rax, operand_of_bool false)]
+  | Lst [Sym "not"; arg] -&gt;
+    compile_exp arg @
+    [ Cmp (Reg Rax, operand_of_bool false) ]
+    @ zf_to_bool
+  | Lst [Sym "zero?"; arg] -&gt;
+    compile_exp arg @
+    [ Cmp (Reg Rax, operand_of_num 0) ]
+    @ zf_to_bool
+</pre
+            >
+          </div>
+
+          <p>
+            Lastly, we can implement <code>num?</code>. We can detect if a value
+            is a number by looking at the last two bits and seeing if they are
+            both zero. We can do that like this:
+          </p>
+
+          <div class="org-src-container">
+            <pre class="src src-ocaml">
+let rec compile_exp (exp : s_exp) : directive list =
+  match exp with
+  (* some cases elided ... *)
+  | Lst [Sym "num?"; arg] -&gt;
+    compile_exp arg @
+    [ And (Reg Rax, Imm num_mask); Cmp (Reg Rax, Imm num_tag) ]
+    @ zf_to_bool
+</pre
+            >
+          </div>
+        </div>
+      </div>
+      <div id="footnotes">
+        <h2 class="footnotes">Footnotes:</h2>
+        <div id="text-footnotes">
+          <div class="footdef">
+            <sup><a id="fn.1" class="footnum" href="#fnr.1">1</a></sup>
+            <div class="footpara">
+              <p class="footpara">
+                Actually, all of the flags are packed together in the same
+                special RFLAGS register
+              </p>
+            </div>
+          </div>
+
+          <div class="footdef">
+            <sup><a id="fn.2" class="footnum" href="#fnr.2">2</a></sup>
+            <div class="footpara">
+              <p class="footpara">
+                It actually just takes the lower byte of a register, which are
+                notated differently in assembly&#x2013;for instance, the lower
+                byte of <code>rax</code> is written <code>al</code>. Our
+                assembly library takes care of this, so we won&rsquo;t talk
+                about it too much in class.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="postamble" class="status">
+      <footer>
+        Content by Doug Woos, with modifications by Sarah E. Chasins<br />Style
+        adapted from
+        <a href="http://taopeng.me/org-notes-style/">org-notes-style</a>
+      </footer>
+    </div>
+  </body>
+</html>

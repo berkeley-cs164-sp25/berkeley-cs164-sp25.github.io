@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Conditionals</title>
+    <meta name="generator" content="Org mode" />
+    <meta name="author" content="S. Chasins" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link
+      href="https://www.dougwoos.com/assets/lecture-notes.css"
+      rel="stylesheet"
+      type="text/css"
+    />
+    <script type="text/javascript">
+      // @license magnet:?xt=urn:btih:e95b018ef3580986a04669f1b5879592219e2a7a&dn=public-domain.txt Public Domain
+      <!--/*--><![CDATA[/*><!--*/
+      function CodeHighlightOn(elem, id) {
+        var target = document.getElementById(id);
+        if (null != target) {
+          elem.classList.add("code-highlighted");
+          target.classList.add("code-highlighted");
+        }
+      }
+      function CodeHighlightOff(elem, id) {
+        var target = document.getElementById(id);
+        if (null != target) {
+          elem.classList.remove("code-highlighted");
+          target.classList.remove("code-highlighted");
+        }
+      }
+      /*]]>*/ //-->
+      // @license-end
+    </script>
+  </head>
+  <body>
+    <div id="content">
+      <header>
+        <h1 class="title">Conditionals</h1>
+      </header>
+      <nav id="table-of-contents">
+        <h2>Table of Contents</h2>
+        <div id="text-table-of-contents">
+          <ul>
+            <li><a href="#orge02a3c5">Conditionals in the interpreter</a></li>
+            <li><a href="#org590fbf0">Conditionals in the compiler</a></li>
+          </ul>
+          <li><a href="#org239caed">Looking ahead</a></li>
+        </div>
+      </nav>
+      <p>
+        Now that we&rsquo;ve implemented booleans, we can implement
+        <code>if</code>. Our <code>if</code> form looks like this:
+      </p>
+
+      <div class="org-src-container">
+        <pre class="src src-lisp">
+(if &lt;test&gt; &lt;then&gt; &lt;else&gt;)
+</pre
+        >
+      </div>
+
+      <p>
+        An <code>if</code> expression evaluates to the
+        <code>then</code> expression if <code>test</code> evaluates to a
+        &ldquo;truthy&rdquo; value, and evaluates to the
+        <code>else</code> expression otherwise. Remember that in our language,
+        all values other than <code>false</code> are truthy!
+      </p>
+
+      <p>
+        What makes these <i>conditional</i> expressions different from
+        operations we&rsquo;ve seen before is that we&rsquo;ll need to evaluate
+        different expressions depending on the value of another expression. This
+        is easy in the interpreter&#x2013;we&rsquo;ll just use OCaml&rsquo;s
+        <code>if</code> expression! In the compiler, we&rsquo;ll rely on a
+        feature of x86-64 that we haven&rsquo;t seen yet.
+      </p>
+
+      <div id="outline-container-orge02a3c5" class="outline-3">
+        <h3 id="orge02a3c5">Conditionals in the interpreter</h3>
+        <div class="outline-text-3" id="text-orge02a3c5">
+          <p>
+            This part is pretty simple! We&rsquo;ll just add a case to
+            <code>interp_exp</code>:
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 1: </span
+              ><code>interp.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let rec interp_exp (exp : s_exp) : value =
+  match exp with
+  (* some cases elided... *)
+  | Lst [Sym "if"; test_exp; then_exp; else_exp] -&gt;
+    if interp_exp test_exp = Boolean false then interp_exp else_exp
+    else interp_exp then_exp
+</pre
+            >
+          </div>
+
+          <p>
+            And that&rsquo;s it! The one thing to note here is that we only
+            evaluate one of the two expressions.
+          </p>
+        </div>
+      </div>
+
+      <div id="outline-container-org590fbf0" class="outline-3">
+        <h3 id="org590fbf0">Conditionals in the compiler</h3>
+        <div class="outline-text-3" id="text-org590fbf0">
+          <p>
+            x86-64 doesn&rsquo;t have &ldquo;if&rdquo; built in, but it does
+            have a standard way of implementing conditionals: with
+            <i>conditional jumps</i>.
+          </p>
+
+          <p>
+            So far, all of the assembly code we&rsquo;ve seen is
+            <i>straight-line</i> code: we start executing instructions at the
+            <code>entry</code> label, and keep going until we get to
+            <code>ret</code>. We can write straight-line code in higher-level
+            languages too (and this code is generally pretty easy to compile to
+            assembly). Higher-level languages also have various constructs to
+            execute code conditionally, or more than once&#x2013;things like
+            conditionals and loops and functions.
+          </p>
+
+          <p>
+            x86-64 machine code, like most machine codes, really only has one
+            way of writing non straight-line code: jumps. A jump instruction
+            lets us start executing from a label elsewhere in our program.
+            It&rsquo;s what the runtime does to start executing from our
+            <code>entry</code> label.
+          </p>
+
+          <p>
+            A <i>conditional</i> jump lets us jump to another label depending on
+            the flags we talked about above. We&rsquo;ll be using
+            <code>jz &lt;label&gt;</code>, which jumps to a given label
+            <b>if and only if</b> the <code>ZF</code> flag is set. So in order
+            to compile <code>(if test then else)</code>, we&rsquo;ll want
+            something like:
+          </p>
+
+          <div class="org-src-container">
+            <pre class="src src-asm">
+    ; code for the test expression
+    cmp rax, 0b00011111 ; compare to boolean false
+    jz else
+    ; code for the then expression
+    jmp continue
+else:
+    ; code for the else expression
+continue:
+</pre
+            >
+          </div>
+
+          <p>
+            The &ldquo;then&rdquo; code is skipped when the test expression is
+            false, because of the
+            <code>jz</code> instruction. The &ldquo;else&rdquo; code is skipped
+            whenever we evaluate the &ldquo;then&rdquo; code, because of the
+            <code>jmp</code> instruction. Cool, right?
+          </p>
+
+          <p>Our OCaml implementation follows that pseudocode:</p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 2: </span>compile.ml</label
+            >
+            <pre class="src src-ocaml">
+let rec compile_exp (exp : s_exp) : directive list =
+  match exp with
+  (* some cases elided ... *)
+  | Lst [Sym "if"; test_exp; then_exp; else_exp] -&gt;
+    compile_exp test_exp
+    @ [Cmp (Reg Rax, operand_of_bool false); Jz "else"]
+    @ compile_exp then_exp @ [Jmp "continue"]
+    @ [Label "else"]
+    @ compile_exp else_exp 
+    @ [Label "continue"]
+</pre
+            >
+          </div>
+
+          <p>
+            There&rsquo;s one big problem here. What if we have more than one
+            <code>if</code> expression? Something like this:
+          </p>
+
+          <div class="org-src-container">
+            <pre class="src src-lisp">
+(if (num? 4) (if (num? false) 1 2) 3)
+</pre
+            >
+          </div>
+
+          <p>
+            Right now, our assembler is going to throw an error if we try to
+            compile this program, something like:
+          </p>
+
+          <div class="org-src-container">
+            <pre class="src src-ocaml">
+program.s:17: error: label `_else' inconsistently redefined
+program.s:13: note: label `_else' originally defined here
+program.s:19: error: label `_continue' inconsistently redefined
+program.s:15: note: label `_continue' originally defined here
+</pre
+            >
+          </div>
+
+          <p>
+            We&rsquo;re using our label names more than once! That&rsquo;s not
+            going to work. We&rsquo;ll need to make sure that each
+            <code>if</code> expression has its own labels for
+            <code>else</code> and <code>continue</code>. We&rsquo;ll use a
+            function called <code>gensym</code
+            ><sup><a id="fnr.1" class="footref" href="#fn.1">1</a></sup> in
+            order to generate unique label names. We can call gensym like this:
+          </p>
+
+          <div class="org-src-container">
+            <pre class="src src-ocaml">
+$ Util.gensym "else";;
+"else__0"
+$ Util.gensym "else";;
+"else__1"
+$ Util.gensym "continue";;
+"continue__2"
+</pre
+            >
+          </div>
+
+          <p>
+            This function is very different from, say, our
+            <code>compile_exp</code> or <code>interp_exp</code>
+            functions: it returns a different output every time we call it!
+            (Indeed, its whole purpose is to return a different output every
+            time we call it.) It&rsquo;s defined like this:
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 3: </span>util.ml</label
+            >
+            <pre class="src src-ocaml">
+let gensym : string -&gt; string =
+  let counter = ref 0 in
+  fun s -&gt;
+    let symbol = Printf.sprintf "%s__%d" s !counter in
+    counter := !counter + 1 ;
+    symbol
+
+</pre
+            >
+          </div>
+
+          <p>
+            The <code>counter</code> variable is what makes this function work.
+            <code>counter</code> is a <i>reference</i> to an integer; it works
+            sort of like a variable in a typical imperative language like Java
+            or Python. We can update its value with
+            <code>counter := &lt;new value&gt;</code> and read its value with
+            <code>!counter</code>. This little function is a good example of
+            idiomatic usage of references in OCaml: use references as little as
+            possible, and hide them in functions that do a specific thing. We
+            can&rsquo;t update <code>counter</code> from outside this function.
+          </p>
+
+          <p>
+            Using our <code>gensym</code> function, we can complete our
+            <code>if</code> compiler:
+          </p>
+
+          <div class="org-src-container">
+            <pre class="src src-ocaml">
+let rec compile_exp (exp : s_exp) : directive list =
+  match exp with
+  (* some cases elided ... *)
+  | Lst [Sym "if"; test_exp; then_exp; else_exp] -&gt;
+    let else_label = Util.gensym "else" in
+    let continue_label = Util.gensym "continue" in
+    compile_exp test_exp
+    @ [Cmp (Reg Rax, operand_of_bool false); Jz else_label]
+    @ compile_exp then_exp @ [Jmp continue_label]
+    @ [Label else_label]
+    @ compile_exp else_exp @ [Label continue_label]
+</pre
+            >
+          </div>
+        </div>
+      </div>
+
+      <div id="outline-container-org239caed" class="outline-2">
+        <h2 id="org239caed">Looking ahead</h2>
+        <div class="outline-text-2" id="text-org239caed">
+          <p>
+            Today we introduced two new concepts in x86-64 machine code: flags
+            and jumps. Next time we&rsquo;ll implement binary operations, for
+            which we&rsquo;ll need one more concept: memory. After that, though,
+            we really won&rsquo;t be further complicating our model of how the
+            processor executes. We&rsquo;ll need a few more instructions here
+            and there, but there won&rsquo;t be any more big ideas at the
+            assembly level. This will be a blessing and a curse: the way the
+            processor executes is relatively simple and easy to understand,
+            which means that compiling high-level language constructs like
+            functions is pretty challenging! It&rsquo;s going to be fun.
+          </p>
+        </div>
+      </div>
+      <div id="footnotes">
+        <h2 class="footnotes">Footnotes:</h2>
+        <div id="text-footnotes">
+          <div class="footdef">
+            <sup><a id="fn.1" class="footnum" href="#fnr.1">1</a></sup>
+            <div class="footpara">
+              <p class="footpara">
+                Short for &ldquo;generated symbol&rdquo;; the name comes from
+                early LISP implementations
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="postamble" class="status">
+      <footer>
+        Content by Doug Woos, with modifications by Sarah E. Chasins<br />Style
+        adapted from
+        <a href="http://taopeng.me/org-notes-style/">org-notes-style</a>
+      </footer>
+    </div>
+  </body>
+</html>

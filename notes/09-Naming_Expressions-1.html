@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Naming expressions with let: Interpreter Edition</title>
+    <meta name="generator" content="Org mode" />
+    <meta name="author" content="S. Chasins" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link
+      href="https://www.dougwoos.com/assets/lecture-notes.css"
+      rel="stylesheet"
+      type="text/css"
+    />
+    <script type="text/javascript">
+      // @license magnet:?xt=urn:btih:e95b018ef3580986a04669f1b5879592219e2a7a&dn=public-domain.txt Public Domain
+      <!--/*--><![CDATA[/*><!--*/
+      function CodeHighlightOn(elem, id) {
+        var target = document.getElementById(id);
+        if (null != target) {
+          elem.classList.add("code-highlighted");
+          target.classList.add("code-highlighted");
+        }
+      }
+      function CodeHighlightOff(elem, id) {
+        var target = document.getElementById(id);
+        if (null != target) {
+          elem.classList.remove("code-highlighted");
+          target.classList.remove("code-highlighted");
+        }
+      }
+      /*]]>*/ //-->
+      // @license-end
+    </script>
+  </head>
+  <body>
+    <div id="content">
+      <header>
+        <h1 class="title">Naming expressions with let: Interpreter Edition</h1>
+      </header>
+      <nav id="table-of-contents">
+        <h2>Table of Contents</h2>
+        <div id="text-table-of-contents">
+          <ul>
+            <li><a href="#org3e45662">Names in the interpreter</a></li>
+          </ul>
+        </div>
+      </nav>
+      <p>
+        Now that we know how to access memory, we can add support for names. Our
+        language will support OCaml-style variable binding: variables are
+        immutable, and are bound in expressions using <code>let</code>. Some
+        examples:
+      </p>
+
+      <div class="org-src-container">
+        <pre class="src src-lisp">
+(let ((x 1)) x) ; =&gt; 1
+(let ((x 3)) (let ((y (+ x 2)) (+ x y))) ; =&gt; 8
+(let ((x 3)) (let ((x (+ x 2)) (+ x x))) ; =&gt; 10
+</pre
+        >
+      </div>
+
+      <p>
+        As usual, we&rsquo;ll start with our interpreter and then work on the
+        compiler.
+      </p>
+
+      <div id="outline-container-org3e45662" class="outline-2">
+        <h2 id="org3e45662">Names in the interpreter</h2>
+        <div class="outline-text-2" id="text-org3e45662">
+          <p>How should the interpreter evaluate this expression?</p>
+
+          <div class="org-src-container">
+            <pre class="src src-lisp">
+x
+</pre
+            >
+          </div>
+
+          <p>
+            It depends! If the expression is nested inside a <code>let</code>,
+            e.g.,
+          </p>
+
+          <div class="org-src-container">
+            <pre class="src src-lisp">
+(let ((x 1)) x)
+</pre
+            >
+          </div>
+
+          <p>
+            then the interpreter should evaluate it to its bound value.
+            Otherwise, <code>x</code> is meaningless. So it seems like the
+            interpreter needs to do different things depending on context. We
+            can&rsquo;t just do <code>interp_expr (Sym "x")</code> and expect it
+            to do the right thing!
+          </p>
+
+          <p>
+            We&rsquo;ll supply this context via another argument to the
+            interpreter. This argument stores a mapping between names (i.e.,
+            strings) and values. In <code>util.ml</code>, we&rsquo;ve defined a
+            type called <code>symtab</code> (short for &ldquo;symbol
+            table&rdquo;) that maps strings to some other value. We can use
+            symbol tables like this:
+          </p>
+
+          <div class="org-src-container">
+            <pre class="src src-ocaml">
+$ open Cs164.Util;;
+$ let st : int symtab = Symtab.empty;;
+$ let st' = Symtab.add "x" 2 st;;
+$ Symtab.find "x" st';;
+2
+$ Symtab.find_opt "x" st;;
+Exception: Not_found
+</pre
+            >
+          </div>
+
+          <p>
+            Symbol tables are sort of like dictionaries in Python or Java,
+            except that they are <i>immutable</i>: notice that adding a key to
+            <code>st</code> above returned a new symbol table instead of
+            changing <code>st</code>. (For the curious, our symbol tables use
+            <a
+              href="https://caml.inria.fr/pub/docs/manual-ocaml/libref/Map.html"
+              >OCaml&rsquo;s <code>Map</code> type</a
+            >, which is implemented using balanced binary trees.) We&rsquo;ll be
+            using only a few functions to manipulate our tables:
+          </p>
+
+          <ul class="org-ul">
+            <li>
+              <code>Symtab.empty</code> is the empty symbol table, containing no
+              mappings
+            </li>
+            <li>
+              <code>Symtab.add var value st</code> returns a symbol table with
+              all of <code>st</code>&rsquo;s mappings plus a mapping between
+              <code>var</code> and <code>value</code>; any previous mapping for
+              <code>var</code> is overwritten
+            </li>
+            <li>
+              <code>Symtab.mem var st</code> returns <code>true</code> if
+              <code>st</code> has a mapping for <code>var</code> and
+              <code>false</code> otherwise
+            </li>
+            <li>
+              <code>Symtab.find var st</code> returns the value
+              <code>var</code> is mapped to in <code>st</code>, raising an
+              exception if no such mapping is present
+            </li>
+          </ul>
+
+          <p>
+            OK, so we&rsquo;re going to need to modify our interpreter to take a
+            <code>value symtab</code> as an argument:
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 1: </span
+              ><code>interp.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let rec interp_exp (env: value symtab) (exp : s_exp) : value = ...
+</pre
+            >
+          </div>
+
+          <p>
+            <code>env</code> is short for &ldquo;environment&rdquo;. None of our
+            existing expressions modify the environment, so they&rsquo;ll all
+            just pass it through in their recursive calls.
+          </p>
+
+          <p>
+            Now that we have our environment, we can use it to interpret names:
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 2: </span
+              ><code>interp.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let rec interp_exp (env: value symtab) (exp : s_exp) : value =
+  match exp with
+  (* some cases elided ... *)
+  | Sym var when Symtab.mem var env -&gt;
+    Symtab.find var env
+</pre
+            >
+          </div>
+
+          <p>
+            That &ldquo;when&rdquo; restricts when this pattern fires:
+            we&rsquo;ll only evaluate the right-hand side of the pattern if the
+            &ldquo;when&rdquo; condition is true.
+          </p>
+
+          <p>We&rsquo;ll also need to update <code>interp</code>:</p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 3: </span
+              ><code>interp.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let interp (program : string) : string =
+  parse program |&gt; interp_exp Symtab.empty |&gt; string_of_value
+</pre
+            >
+          </div>
+
+          <p>Let&rsquo;s see our interpreter work:</p>
+
+          <div class="org-src-container">
+            <pre class="src src-ocaml">
+$ Interp.interp_exp Symtab.empty (parse "x");;
+&lt;BadExpression error&gt;
+$ Interp.interp_exp (Symtab.add "x" (Number 1) Symtab.empty) (parse "x");;
+Number 1
+$ Interp.interp_exp (Symtab.add "x" (Number 1) Symtab.empty) (parse "(+ x x)");;
+Number 2
+</pre
+            >
+          </div>
+
+          <p>
+            Cool! Now we just need to implement <code>let</code>, which updates
+            this environment. It&rsquo;s pretty straightforward:
+          </p>
+
+          <div class="org-src-container">
+            <pre class="src src-ocaml">
+let rec interp_exp (env : value symtab) (exp : s_exp) : value =
+  match exp with
+  (* some cases elided... *)
+  | Lst [Sym "let"; Lst [Lst [Sym var; e]]; body] -&gt;
+      let e_value = interp_exp env e in
+      interp_exp (Symtab.add var e_value env) body
+</pre
+            >
+          </div>
+
+          <p>
+            You may notice an &ldquo;extra&rdquo; <code>Lst</code> constructor;
+            that&rsquo;s because our <code>let</code> expression looks like
+            <code>(let ((var val)) body)</code>. This is how Scheme&rsquo;s
+            <code>let</code> works, so we&rsquo;ve done it that way as well. In
+            Homework 3, you&rsquo;ll add support for multiple variables:
+          </p>
+
+          <div class="org-src-container">
+            <pre class="src src-lisp">
+(let ((x 1) (y 2)) (+ x y))
+</pre
+            >
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="postamble" class="status">
+      <footer>
+        Content by Doug Woos, with modifications by Sarah E. Chasins<br />Style
+        adapted from
+        <a href="http://taopeng.me/org-notes-style/">org-notes-style</a>
+      </footer>
+    </div>
+  </body>
+</html>

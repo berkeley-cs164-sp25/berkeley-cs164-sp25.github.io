@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Binary operations</title>
+    <meta name="generator" content="Org mode" />
+    <meta name="author" content="S. Chasins" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link
+      href="https://www.dougwoos.com/assets/lecture-notes.css"
+      rel="stylesheet"
+      type="text/css"
+    />
+    <script type="text/javascript">
+      // @license magnet:?xt=urn:btih:e95b018ef3580986a04669f1b5879592219e2a7a&dn=public-domain.txt Public Domain
+      <!--/*--><![CDATA[/*><!--*/
+      function CodeHighlightOn(elem, id) {
+        var target = document.getElementById(id);
+        if (null != target) {
+          elem.classList.add("code-highlighted");
+          target.classList.add("code-highlighted");
+        }
+      }
+      function CodeHighlightOff(elem, id) {
+        var target = document.getElementById(id);
+        if (null != target) {
+          elem.classList.remove("code-highlighted");
+          target.classList.remove("code-highlighted");
+        }
+      }
+      /*]]>*/ //-->
+      // @license-end
+    </script>
+  </head>
+  <body>
+    <div id="content">
+      <header>
+        <h1 class="title">Binary operations</h1>
+      </header>
+      <nav id="table-of-contents">
+        <h2>Table of Contents</h2>
+        <div id="text-table-of-contents">
+          <ul>
+            <li>
+              <a href="#org60ece2e">Binary operations in the interpreter</a>
+            </li>
+            <li>
+              <a href="#org3109ef8">Binary operations in the compiler</a>
+              <ul>
+                <li><a href="#org39a37e3">The stack</a></li>
+                <li>
+                  <a href="#org917a4e3">Accessing the stack from assembly</a>
+                </li>
+                <li><a href="#org53d8187">Tracking the stack index</a></li>
+                <li><a href="#org9bb5b64">Other binary operations</a></li>
+              </ul>
+            </li>
+          </ul>
+        </div>
+      </nav>
+      <p>
+        So far, the programs in our language have only had to deal with one
+        value at a time. That&rsquo;s quite intentional&#x2013;by restricting
+        our language in this way we&rsquo;ve been able to compile everything
+        using only the <code>rax</code> register! Today, that changes. Instead
+        of dealing with one value, we&rsquo;re going to introduce operations
+        that deal with&#x2013;get this--<b>two</b> values. As it turns out, this
+        is much more challenging!
+      </p>
+
+      <div id="outline-container-org60ece2e" class="outline-2">
+        <h2 id="org60ece2e">Binary operations in the interpreter</h2>
+        <div class="outline-text-2" id="text-org60ece2e">
+          <p>
+            &#x2026;Or at least, it&rsquo;s much more challenging in the
+            compiler. Binary operations in our interpreter really won&rsquo;t be
+            very different from unary operations! First off, here are the
+            operations we will support:
+          </p>
+
+          <ul class="org-ul">
+            <li>
+              <code>(+ e1 e2)</code> adds the values of the expressions
+              <code>e1</code> and <code>e2</code>. <code>e1</code> and
+              <code>e2</code> should evaluate to numbers.
+            </li>
+            <li>
+              <code>(- e1 e2)</code> subtracts the values of the expressions
+              <code>e1</code> and <code>e2</code>. <code>e1</code> and
+              <code>e2</code> should evaluate to numbers.
+            </li>
+            <li>
+              <code>(= e1 e2)</code> evaluates to <code>true</code> if
+              <code>e1</code> and <code>e2</code> evaluate to the same value and
+              <code>false</code> otherwise
+            </li>
+            <li>
+              <code>(&lt; e1 e2)</code> evaluates to <code>true</code> if
+              <code>e1</code> evaluates to a smaller number than
+              <code>e2</code> and <code>false</code> otherwise.
+              <code>e1</code> and <code>e2</code> should evaluate to numbers.
+            </li>
+          </ul>
+
+          <p>
+            Here are the cases we&rsquo;ll need to add to
+            <code>interp_exp</code>:
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 1: </span
+              ><code>interp.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let interp_exp exp =
+  match exp with
+  (* some cases elided... *)
+  | Lst [Sym "+"; e1; e2] -&gt; (
+    match (interp_exp e1, interp_exp e2) with
+    | Number n1, Number n2 -&gt;
+        Number (n1 + n2)
+    | _ -&gt;
+        raise (BadExpression exp) )
+  | Lst [Sym "-"; e1; e2] -&gt; (
+    match (interp_exp e1, interp_exp e2) with
+    | Number n1, Number n2 -&gt;
+        Number (n1 - n2)
+    | _ -&gt;
+        raise (BadExpression exp) )
+  | Lst [Sym "="; e1; e2] -&gt;
+      Boolean (interp_exp e1 = interp_exp e2)
+  | Lst [Sym "&lt;"; e1; e2] -&gt; (
+    match (interp_exp e1, interp_exp e2) with
+    | Number n1, Number n2 -&gt;
+        Boolean (n1 &lt; n2)
+    | _ -&gt;
+        raise (BadExpression exp) )    
+</pre
+            >
+          </div>
+
+          <p>
+            Notice that this code enforces type-correctness: <code>+</code> and
+            <code>&lt;</code> will only work on numbers. Just as we&rsquo;ve
+            seen with unary operations and conditionals, the interpreter is just
+            relying on OCaml&rsquo;s implementations of these features.
+          </p>
+        </div>
+      </div>
+
+      <div id="outline-container-org3109ef8" class="outline-2">
+        <h2 id="org3109ef8">Binary operations in the compiler</h2>
+        <div class="outline-text-2" id="text-org3109ef8">
+          <p>Here&rsquo;s where it gets tricky.</p>
+
+          <p>
+            Let&rsquo;s try to sort of &ldquo;naively&rdquo; translate the
+            interpreter version of <code>+</code>
+            (reminder: right now the compiler, unlike the interpreter, does not
+            enforce type-correctness):
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 2: </span>compile.ml</label
+            >
+            <pre class="src src-ocaml">
+let compile_exp exp =
+  match exp with
+    (* some cases elided... *)
+  | Lst [Sym "+"; e1; e2] -&gt;
+     compile_exp e1 @ compile_exp e2 @ ...
+</pre
+            >
+          </div>
+
+          <p>
+            Remember: <code>compile_exp</code> emits instructions to compute the
+            value of <code>exp</code> and to store that value in
+            <code>rax</code>. So by the time we want to add the two values,
+            <code>e2</code> is going to be in <code>rax</code> and
+            <code>e1</code> is going to be lost! So, we&rsquo;ll somehow need to
+            &ldquo;save&rdquo; the value of <code>e1</code>. Here&rsquo;s an
+            idea: we could save it to a different register! x86-64 has 16
+            general-purpose registers; let&rsquo;s use <code>r8</code>, written
+            <code>Reg R8</code> in our OCaml assembly library:
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 3: </span>compile.ml</label
+            >
+            <pre class="src src-ocaml">
+let compile_exp exp =
+  match exp with
+    (* some cases elided... *)
+  | Lst [Sym "+"; e1; e2] -&gt;
+     compile_exp e1 @ [Mov (Reg R8, Reg Rax)] @ compile_exp e2 @ [Add (Reg Rax, Reg R8)]
+</pre
+            >
+          </div>
+
+          <p>
+            Here we&rsquo;re saving compiling <code>e1</code> into
+            <code>rax</code>, saving <code>rax</code> into <code>r8</code>,
+            compiling <code>e2</code> into <code>rax</code>, then adding the
+            results of the two expressions together. This seems to work great!
+          </p>
+
+          <div class="org-src-container">
+            <pre class="src src-ocaml">
+$ compile_and_run "(+ 1 2)";;
+3
+$ compile_and_run "(+ (+ 1 2) 3)";;
+6
+$ compile_and_run "(+ 1 (+ 2 3))";;
+7
+</pre
+            >
+          </div>
+
+          <p>
+            Wait, what was that last result? Something&rsquo;s not right here.
+            Let&rsquo;s look at the assembly we&rsquo;re producing:
+          </p>
+
+          <div class="org-src-container">
+            <pre class="src src-asm">
+entry:
+        mov rax, 4
+        mov r8, rax
+        mov rax, 8
+        mov r8, rax
+        mov rax, 12
+        add rax, r8
+        add rax, r8
+        ret
+</pre
+            >
+          </div>
+
+          <p>
+            We&rsquo;re compiling <code>(+ 1 (+ 2 3))</code> by first storing
+            the runtime representation of <code>1</code> in <code>r8</code>,
+            then compiling the second argument to <code>+</code>. But since the
+            second argument is also a call to <code>+</code>, the first thing
+            it&rsquo;s going to do is do overwrite the value in
+            <code>r8</code> (in this case, with the runtime representation of
+            <code>2</code>).
+          </p>
+
+          <p>
+            We could try to get around this by using more registers. We could
+            imagine having our compiler take a list of registers it&rsquo;s not
+            allowed to use when compiling an expression&#x2013;here, since
+            <code>r8</code> is being used to store <code>1</code>, we
+            couldn&rsquo;t use <code>r8</code> when compiling
+            <code>(+ 2 3)</code>. If we had an infinite number of registers, a
+            scheme like this could work. But since we only have 16, there are
+            going to be expressions that we won&rsquo;t be able to compile with
+            that kind of scheme.
+          </p>
+
+          <p>
+            So we need someplace to store intermediate values during
+            computation, where we won&rsquo;t run out of room. How about memory?
+          </p>
+        </div>
+
+        <div id="outline-container-org39a37e3" class="outline-3">
+          <h3 id="org39a37e3">The stack</h3>
+          <div class="outline-text-3" id="text-org39a37e3">
+            <p>
+              The region of memory that our program has available for temporary
+              use during computations is called the <i>stack</i>. (Longer-lived
+              values live in the <i>heap</i>, which we&rsquo;ll talk about in a
+              few lectures.) We&rsquo;ll start with a simple model of this
+              region of memory; we&rsquo;ll make this model more complex, and
+              somewhat more accurate, when we talk about functions.
+            </p>
+
+            <p>
+              Imagine the stack as an array of cells, each of which has an
+              address. The bottom of our stack is at the <i>highest</i> address.
+              When our program starts executing, the register
+              <code>rsp</code> contains this address. The memory cell at this
+              address contains the function&rsquo;s return address. We&rsquo;ll
+              learn more about what that means later; for now, just know that we
+              shouldn&rsquo;t overwrite the data at that address.
+            </p>
+
+            <p>
+              The &ldquo;next&rdquo; memory cell in the stack&#x2013;that is,
+              the first cell that we can write data into&#x2013;is at
+              <code>(rsp - 8)</code>. Why <code>-</code>? Because the stack
+              grows &ldquo;up&rdquo;, from higher addresses to lower addresses.
+              <code>rsp + 8</code> probably contains data used by the calling
+              function. Why <code>8</code>? Because the <i>word size</i> on
+              x86-64 is 8 bytes (64 bits). x86-64 memory addresses are 8 bytes;
+              x86-64 registers are 8 bytes; all of our program values are 8
+              bytes. So the stack looks like this:
+            </p>
+
+            <table>
+              <colgroup>
+                <col class="org-left" />
+
+                <col class="org-left" />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th scope="col" class="org-left">address</th>
+                  <th scope="col" class="org-left">data</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="org-left">&#x2026;</td>
+                  <td class="org-left">&#x2026;</td>
+                </tr>
+
+                <tr>
+                  <td class="org-left"><code>rsp - 16</code></td>
+                  <td class="org-left">unused</td>
+                </tr>
+
+                <tr>
+                  <td class="org-left"><code>rsp - 8</code></td>
+                  <td class="org-left">unused</td>
+                </tr>
+
+                <tr>
+                  <td class="org-left"><code>rsp</code></td>
+                  <td class="org-left">address of caller stack frame</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="outline-container-org917a4e3" class="outline-3">
+          <h3 id="org917a4e3">Accessing the stack from assembly</h3>
+          <div class="outline-text-3" id="text-org917a4e3">
+            <p>
+              We&rsquo;ve seen the <code>mov</code> instruction before&#x2013;it
+              lets us move immediate data into registers, or move data between
+              registers. It also lets us move data between registers and memory.
+              So, let&rsquo;s modify our compiler to save the value of the first
+              argument to <code>+</code> to memory instead of <code>r8</code>.
+            </p>
+
+            <div class="org-src-container">
+              <label class="org-src-name"
+                ><span class="listing-number">Listing 4: </span
+                >compile.ml</label
+              >
+              <pre class="src src-ocaml">
+let compile_exp exp =
+  match exp with
+    (* some cases elided... *)
+  | Lst [Sym "+"; e1; e2] -&gt;
+      compile_exp e1
+      @ [Mov (MemOffset (Reg Rsp, Imm (-8)), Reg Rax)]
+      @ compile_exp e2
+      @ [Mov (Reg R8, MemOffset (Reg Rsp, Imm (-8)))]
+      @ [Add (Reg Rax, Reg R8)]
+</pre
+              >
+            </div>
+
+            <p>If we compile <code>(+ 1 2)</code> now, we get this:</p>
+
+            <div class="org-src-container">
+              <pre class="src src-asm">
+entry:
+        mov rax, 4
+        mov [rsp + -8], rax
+        mov rax, 8
+        mov r8, [rsp + -8]
+        add rax, r8
+        ret
+</pre
+              >
+            </div>
+
+            <p>
+              Those square-bracketed expressions are how our assembly language
+              represents memory accesses. As we see, offsets into memory (of the
+              form <code>&lt;operand&gt; + &lt;operand&gt;</code>) can be used
+              as operands to instructions like <code>mov</code> and
+              <code>add</code>.
+            </p>
+
+            <p>
+              What happens if we compile <code>(+ 1 (+ 2 3))</code> now? We
+              still have the same problem we did before--<code>2</code> is
+              overwriting <code>1</code>, this time at
+              <code>[rsp - 8]</code> instead of in <code>r8</code>:
+            </p>
+
+            <div class="org-src-container">
+              <pre class="src src-asm">
+entry:
+        mov rax, 4
+        mov [rsp + -8], rax
+        mov rax, 8
+        mov [rsp + -8], rax
+        mov rax, 12
+        mov r8, [rsp + -8]
+        add rax, r8
+        mov r8, [rsp + -8]
+        add rax, r8
+        ret
+</pre
+              >
+            </div>
+
+            <p>Now, though, we&rsquo;ll be able to fix this issue.</p>
+          </div>
+        </div>
+
+        <div id="outline-container-org53d8187" class="outline-3">
+          <h3 id="org53d8187">Tracking the stack index</h3>
+          <div class="outline-text-3" id="text-org53d8187">
+            <p>
+              Instead of storing the intermediate value <code>2</code> at
+              <code>[rsp - 8]</code>, the compiler should store it at the next
+              available stack address: <code>[rsp - 16]</code>. So when we call
+              <code>compile_exp e2</code>, we will need to let it know that
+              <code>[rsp - 16]</code> is the new first stack address.
+            </p>
+
+            <p>
+              We can implement this by adding an argument to
+              <code>compile_exp</code> representing the next available stack
+              index:
+            </p>
+
+            <div class="org-src-container">
+              <label class="org-src-name"
+                ><span class="listing-number">Listing 5: </span
+                ><code>compile.ml</code></label
+              >
+              <pre class="src src-ocaml">
+let compile_exp (stack_index : int) exp = ...
+</pre
+              >
+            </div>
+
+            <p>
+              Most of the time, this <code>stack_index</code> argument will
+              remain unchanged through recursive calls. But if we store
+              something on the stack, we&rsquo;ll need to update it. Right now,
+              we need to do that in exactly one place: that
+              <code>compile_exp e2</code> call. We&rsquo;ll modify our code to
+              store the intermediate value at <code>[rsp + stack_index]</code>,
+              and to subtract 8 from the stack index for that recursive call:
+            </p>
+
+            <div class="org-src-container">
+              <label class="org-src-name"
+                ><span class="listing-number">Listing 6: </span
+                ><code>compile.ml</code></label
+              >
+              <pre class="src src-ocaml">
+let compile_exp stack_index exp =
+  match exp with
+  (* some cases elided... *)
+  | Lst [Sym "+"; e1; e2] -&gt;
+      compile_exp stack_index e1
+      @ [Mov (MemOffset (Reg Rsp, Imm stack_index), Reg Rax)]
+      @ compile_exp (stack_index - 8) e2
+      @ [Mov (Reg R8, MemOffset (Reg Rsp, Imm stack_index))]
+      @ [Add (Reg Rax, Reg R8)]
+</pre
+              >
+            </div>
+
+            <p>We now get the following code for <code>(+ 1 (+ 2 3))</code>:</p>
+
+            <div class="org-src-container">
+              <pre class="src src-asm">
+entry:
+        mov rax, 4
+        mov [rsp + -8], rax
+        mov rax, 8
+        mov [rsp + -16], rax
+        mov rax, 12
+        mov r8, [rsp + -16]
+        add rax, r8
+        mov r8, [rsp + -8]
+        add rax, r8
+        ret
+</pre
+              >
+            </div>
+
+            <p>
+              This now works great! We&rsquo;ve successfully implemented
+              addition.
+            </p>
+          </div>
+        </div>
+
+        <div id="outline-container-org9bb5b64" class="outline-3">
+          <h3 id="org9bb5b64">Other binary operations</h3>
+          <div class="outline-text-3" id="text-org9bb5b64">
+            <p>
+              Our code for the other binary operations we support looks similar:
+            </p>
+
+            <div class="org-src-container">
+              <label class="org-src-name"
+                ><span class="listing-number">Listing 7: </span
+                ><code>compile.ml</code></label
+              >
+              <pre class="src src-ocaml">
+let compile_exp stack_index exp =
+  match exp with
+  (* some cases elided... *)
+  | Lst [Sym "-"; e1; e2] -&gt;
+      compile_exp stack_index e1
+      @ [Mov (MemOffset (Reg Rsp, Imm stack_index), Reg Rax)]
+      @ compile_exp (stack_index - 8) e2
+      @ [Mov (Reg R8, Reg Rax)]
+      @ [Mov (Reg Rax, MemOffset (Reg Rsp, Imm stack_index))]
+      @ [Sub (Reg Rax, Reg R8)]
+  | Lst [Sym "="; e1; e2] -&gt;
+      compile_exp stack_index e1
+      @ [Mov (MemOffset (Reg Rsp, Imm stack_index), Reg Rax)]
+      @ compile_exp (stack_index - 8) e2
+      @ [Mov (Reg R8, MemOffset (Reg Rsp, Imm stack_index))]
+      @ [Cmp (Reg Rax, Reg R8)]
+      @ zf_to_bool
+  | Lst [Sym "&lt;"; e1; e2] -&gt;
+      compile_exp stack_index e1
+      @ [Mov (MemOffset (Reg Rsp, Imm stack_index), Reg Rax)]
+      @ compile_exp (stack_index - 8) e2
+      @ [Mov (Reg R8, MemOffset (Reg Rsp, Imm stack_index))]
+      @ [Cmp (Reg R8, Reg Rax)]
+      @ lf_to_bool
+</pre
+              >
+            </div>
+
+            <p>
+              <code>&lt;</code> uses <code>lf_to_bool</code>, which calls
+              <code>setl</code> instead of <code>setz</code>.
+              <code>setl</code> reads the <code>SF</code> and
+              <code>OF</code> flags; after a comparison operation, it will set
+              its operand to <code>1</code> if the first comparison argument was
+              strictly less than the second.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="postamble" class="status">
+      <footer>
+        Content by Doug Woos, with modifications by Sarah E. Chasins<br />Style
+        adapted from
+        <a href="http://taopeng.me/org-notes-style/">org-notes-style</a>
+      </footer>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Correctness and testing</title>
+<meta name="generator" content="Org mode">
+<meta name="author" content="Sarah E. Chasins">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="lecture-notes.css" rel="stylesheet" type="text/css" />
+<script type="text/javascript">
+// @license magnet:?xt=urn:btih:e95b018ef3580986a04669f1b5879592219e2a7a&dn=public-domain.txt Public Domain
+<!--/*--><![CDATA[/*><!--*/
+     function CodeHighlightOn(elem, id)
+     {
+       var target = document.getElementById(id);
+       if(null != target) {
+         elem.classList.add("code-highlighted");
+         target.classList.add("code-highlighted");
+       }
+     }
+     function CodeHighlightOff(elem, id)
+     {
+       var target = document.getElementById(id);
+       if(null != target) {
+         elem.classList.remove("code-highlighted");
+         target.classList.remove("code-highlighted");
+       }
+     }
+    /*]]>*///-->
+// @license-end
+</script>
+</head>
+<body>
+<div id="preamble" class="status">
+<div class='alert'><span class='bold'>Important:</span> These notes are not designed to subsitute for class sessions.  Importantly, they do <span class='ital'>not</span> cover all content required for the exams or for implementing HWs.  These are just an aid for re-implementing the class compiler, after you've already come to class and completed the in-class activities!</div>
+</div>
+<div id="content">
+<header>
+<h1 class="title">Correctness and testing</h1>
+</header><p>
+If we take the long view, programmers have&#x2013;to put it gently&#x2013;a pretty mixed
+track record vis-a-vis bugs; writing bug-free software is really hard! At the
+same time, it&rsquo;s quite important to ensure that compilers are correct. If your
+compiler has a bug, it could impact anyone writing programs in your language and
+is likely to be very hard for end-users to track down. So: what can we do to
+make sure that our software is correct?
+</p>
+
+<p>
+We have a number of options, all of which have been applied (to varying degrees
+of success) to compilers:
+</p>
+<ul class="org-ul">
+<li>Hand-written correctness arguments</li>
+<li>Testing on particular programs</li>
+<li>Testing different compilers against each other</li>
+<li>Formal verification</li>
+</ul>
+
+<p>
+For this class, our approach is going to be as follows. As we grow our language,
+we&rsquo;re going to add features both to our compiler and to a <i>definitional
+interpreter</i>. This is an interpreter for our language where we don&rsquo;t care about
+performance at all; all we care about is that it&rsquo;s correct. Indeed, this
+interpreter will serve as the <i>definition</i> of our language.
+</p>
+
+<p>
+Here&rsquo;s such an interpreter for the language we have so far:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-ocaml">let rec interp_exp (exp : s_exp) : int =
+  match exp with
+  | Num n -&gt; n
+  | Lst [Sym "add1"; arg] -&gt;
+    (interp_exp arg) + 1
+  | Lst [Sym "sub1"; arg] -&gt;
+      (interp_exp arg) - 1
+  | _ -&gt; raise (BadExpression exp)
+
+let interp (program : string) = string_of_int (interp_exp (parse program))
+</pre>
+</div>
+
+<p>
+Notice that our interpreter has a pretty similar structure to our
+compiler. We&rsquo;ll see this throughout the semester.
+</p>
+
+<p>
+Now that we have an interpreter, we can test our compiler against it:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-ocaml">
+let difftest (examples : string list) =
+  let results = List.map (fun ex -&gt; (compile_and_run ex, interp ex)) examples in
+  List.for_all (fun (r1, r2) -&gt; r1 = r2) results
+
+let test () =
+  difftest ["43"; "(add1 (add1 3))"; "(sub1 4)"]
+
+</pre>
+</div>
+</div>
+<div id="postamble" class="status">
+<footer>Content by Doug Woos, with modifications by Sarah E. Chasins<br/>Style adapted from <a href="http://taopeng.me/org-notes-style/">org-notes-style</a></footer>
+</div>
+</body>
+</html>

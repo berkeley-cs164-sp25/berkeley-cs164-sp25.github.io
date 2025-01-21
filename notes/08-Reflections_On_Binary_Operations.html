@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Reflections On Binary Operations</title>
+    <meta name="generator" content="Org mode" />
+    <meta name="author" content="S. Chasins" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link
+      href="https://www.dougwoos.com/assets/lecture-notes.css"
+      rel="stylesheet"
+      type="text/css"
+    />
+    <script type="text/javascript">
+      // @license magnet:?xt=urn:btih:e95b018ef3580986a04669f1b5879592219e2a7a&dn=public-domain.txt Public Domain
+      <!--/*--><![CDATA[/*><!--*/
+      function CodeHighlightOn(elem, id) {
+        var target = document.getElementById(id);
+        if (null != target) {
+          elem.classList.add("code-highlighted");
+          target.classList.add("code-highlighted");
+        }
+      }
+      function CodeHighlightOff(elem, id) {
+        var target = document.getElementById(id);
+        if (null != target) {
+          elem.classList.remove("code-highlighted");
+          target.classList.remove("code-highlighted");
+        }
+      }
+      /*]]>*/ //-->
+      // @license-end
+    </script>
+  </head>
+  <body>
+    <div id="content">
+      <header>
+        <h1 class="title">Reflections On Binary Operations</h1>
+      </header>
+      <nav id="table-of-contents">
+        <h2>Table of Contents</h2>
+        <div id="text-table-of-contents">
+          <ul>
+            <li><a href="#orgbdaf2b7">A note about stack depth</a></li>
+            <li><a href="#org118666d">A note about the stack pointer</a></li>
+            <li><a href="#org9856a62">A note about undefined behavior</a></li>
+          </ul>
+        </div>
+      </nav>
+      <div id="outline-container-orgbdaf2b7" class="outline-2">
+        <h2 id="orgbdaf2b7">A note about stack depth</h2>
+        <div class="outline-text-2" id="text-orgbdaf2b7">
+          <p>Take a moment to work through this program in our language:</p>
+
+          <div class="org-src-container">
+            <pre class="src src-lisp">
+(+ (+ 1 (+ 2 3)) (+ 4 (+ 5 6)))
+</pre
+            >
+          </div>
+
+          <p>
+            Given our approach for implementing addition in the compiler,
+            what&rsquo;s the biggest offset from the stack pointer at which we
+            will store a value?
+          </p>
+
+          <p>
+            Once you&rsquo;re ready to check your guess, go ahead and look
+            inside <code>program.s</code>. What&rsquo;s the largest offset in
+            the assembly?
+          </p>
+
+          <p>
+            Think about why there&rsquo;s only one value placed at this offset,
+            how the fist and second operands are treated differently, and the
+            difference between calling <code>compile_exp</code> with a given
+            <code>stack_index</code> and actually placing a value at that
+            <code>stack_index</code>. Why is there a difference?
+          </p>
+        </div>
+      </div>
+
+      <div id="outline-container-org118666d" class="outline-2">
+        <h2 id="org118666d">A note about the stack pointer</h2>
+        <div class="outline-text-2" id="text-org118666d">
+          <p>
+            For our purposes in compiler-land, we&rsquo;re taking a simplified
+            view of how the stack works&#x2013;in particular, you may notice
+            we&rsquo;re not updating the stack pointer to prevent interrupts
+            from clobbering our data. See lecture capture for a quick chat about
+            how we&rsquo;d change our binary operation approach to update the
+            stack pointer and a note about why we won&rsquo;t bother to do that
+            bookkeeping.
+          </p>
+        </div>
+      </div>
+
+      <div id="outline-container-org9856a62" class="outline-2">
+        <h2 id="org9856a62">A note about undefined behavior</h2>
+        <div class="outline-text-2" id="text-org9856a62">
+          <p>What should this expression evaluate to?</p>
+
+          <div class="org-src-container">
+            <pre class="src src-lisp">
+(+ 1 false)
+</pre
+            >
+          </div>
+
+          <p>
+            Our interpreter gives us the answer: just like a nonsense expression
+            like
+            <code>(hello cs164)</code>, <code>(+ 1 false)</code> isn&rsquo;t
+            part of our language, so the interpreter raises an exception. What
+            will our compiler do on this program?
+          </p>
+
+          <div class="org-src-container">
+            <pre class="src src-ocaml">
+$ compile_and_run "(+ 1 false)";;
+"BAD 35"
+</pre
+            >
+          </div>
+
+          <p>
+            Our runtime indicates that we&rsquo;ve produced a bad value
+            (specifically, 35)&#x2013;it doesn&rsquo;t correspond to anything in
+            our tagging scheme. So, OK&#x2013;the compiler and the interpreter
+            both end up producing errors on this program.
+          </p>
+
+          <p>How about this program?</p>
+
+          <div class="org-src-container">
+            <pre class="src src-lisp">
+(+ 32 false)
+</pre
+            >
+          </div>
+
+          <p>
+            Our interpreter, of course, still throws an exception. But our
+            compiler does something pretty weird:
+          </p>
+
+          <div class="org-src-container">
+            <pre class="src src-ocaml">
+$ compile_and_run "(+ 32 false)";;
+"true"
+</pre
+            >
+          </div>
+
+          <p>
+            Weird, right? It makes sense, though: since <code>false</code> is
+            represented as <code>0b00011111</code> and <code>32</code> is
+            represented as <code>0b10000000</code>, <code>false + 32</code> is
+            <code>0b10011111</code>, the runtime representation of
+            <code>true</code>.
+          </p>
+
+          <p>
+            So: is this a bug in our compiler? Maybe not!
+            <code>(+ 32 false)</code> isn&rsquo;t a valid program in the
+            language supported by our compiler. There are lots of these invalid
+            programs! Different ones result in different things:
+          </p>
+
+          <ul class="org-ul">
+            <li>
+              Programs like <code>(hello cs164)</code> result in an exception at
+              compile time
+            </li>
+            <li>
+              Programs like <code>(+ 1 false)</code> result in a runtime error
+            </li>
+            <li>
+              Programs like <code>(+ 32 false)</code> result in a strange value
+            </li>
+          </ul>
+
+          <p>
+            The behavior of our compiler on these programs is undefined. We can
+            error our at compile-time, error out at runtime, produce a
+            reasonable-looking value, or anything else. Some real-world
+            programming languages include undefined behavior as part of the
+            language standard; for instance, dereferencing a null pointer in C
+            is undefined.
+          </p>
+
+          <p>
+            Many modern languages, however, eschew undefined behavior&#x2013;as
+            we have just seen, it&rsquo;s quite confusing for programmers! A
+            reasonable specification for programs like
+            <code>(+ 1 true)</code> is that they should result in errors. In a
+            couple of weeks, we will see how to add error-handling to our
+            compiler and get rid of this strange behavior. For now, we&rsquo;ll
+            leave our compiler&rsquo;s behavior specified only on valid
+            expressions.
+          </p>
+        </div>
+      </div>
+    </div>
+    <div id="postamble" class="status">
+      <footer>
+        Content by Doug Woos, with modifications by Sarah E. Chasins<br />Style
+        adapted from
+        <a href="http://taopeng.me/org-notes-style/">org-notes-style</a>
+      </footer>
+    </div>
+  </body>
+</html>

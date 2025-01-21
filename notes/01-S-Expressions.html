@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OCaml and S-Expressions</title>
+<meta name="generator" content="Org mode">
+<meta name="author" content="Sarah E. Chasins">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="lecture-notes.css" rel="stylesheet" type="text/css" />
+<script type="text/javascript">
+// @license magnet:?xt=urn:btih:e95b018ef3580986a04669f1b5879592219e2a7a&dn=public-domain.txt Public Domain
+<!--/*--><![CDATA[/*><!--*/
+     function CodeHighlightOn(elem, id)
+     {
+       var target = document.getElementById(id);
+       if(null != target) {
+         elem.classList.add("code-highlighted");
+         target.classList.add("code-highlighted");
+       }
+     }
+     function CodeHighlightOff(elem, id)
+     {
+       var target = document.getElementById(id);
+       if(null != target) {
+         elem.classList.remove("code-highlighted");
+         target.classList.remove("code-highlighted");
+       }
+     }
+    /*]]>*///-->
+// @license-end
+</script>
+</head>
+<body>
+<div id="preamble" class="status">
+<div class='alert'><span class='bold'>Important:</span> These notes are not designed to subsitute for class sessions.  Importantly, they do <span class='ital'>not</span> cover all content required for the exams or for implementing HWs.  These are just an aid for re-implementing the class compiler, after you've already come to class and completed the in-class activities!</div>
+</div>
+<div id="content">
+<header>
+<h1 class="title">OCaml and S-Expressions</h1>
+</header><nav id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#org0906418">OCaml basics</a>
+</li>
+<li><a href="#orgab1f8d5">S-Expressions</a></li>
+<li><a href="#orgb4f8aef">S-Expressions in OCaml</a></li>
+<li><a href="#orgd3b25bd">S-expressions in our compiler</a></li>
+</ul>
+</div>
+</nav>
+<p>
+Last week we wrote a compiler for a very small language: the integers. Next
+time, we&rsquo;ll grow our language a bit. Today, though, we&rsquo;re going to step back and talk about how the
+OCaml features we&rsquo;ve been learning these last few days actually helped us build our starter compiler. We&rsquo;ll also talk about how to represent our language&rsquo;s syntax.
+</p>
+
+<div id="outline-container-org0906418" class="outline-2">
+<h2 id="org0906418">OCaml basics</h2>
+<div class="outline-text-2" id="text-org0906418">
+<p>
+Here&rsquo;s the compiler we wrote last time:
+</p>
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 1: </span><code>compile.ml</code></label><pre class="src src-ocaml">let compile (program: string): string =
+  String.concat "\n" 
+  [ "global _entry"; 
+  "_entry:"; 
+  Printf.sprintf "\tmov rax, %s" program;
+  "\tret" ]
+</pre>
+</div>
+
+<p>
+This program illustrates several OCaml features (see the prior lecture capture for
+details):
+</p>
+<ul class="org-ul">
+<li>Functions</li>
+<li>Types</li>
+<li>Lists</li>
+</ul>
+</div>
+
+
+
+
+<div id="outline-container-orgab1f8d5" class="outline-2">
+<h2 id="orgab1f8d5">S-Expressions</h2>
+<div class="outline-text-2" id="text-orgab1f8d5">
+<p>
+We want to eventually extend our language with support for many new features,
+such as conditionals and functions. We will talk in great depth about the
+<i>semantics</i> of those features: what a conditional expression <i>means</i>. We&rsquo;ll also
+need to figure out what the <i>syntax</i> corresponding to those features is. For
+instance, conditionals look like this in Javascript:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-javascript">if (x) {
+  return y;
+} else {
+  return z;
+}
+</pre>
+</div>
+
+<p>
+And like this in Python:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-python">if x:
+  return y
+else:
+  return z
+</pre>
+</div>
+
+<p>
+We will talk more about syntax much later in the course. For now, our language
+is going to support a very simple syntax: S-expressions.
+</p>
+
+<p>
+S-expressions (short for &ldquo;symbolic expressions&rdquo;) were introduced by John
+McCarthy in his paper on the LISP programming language. They were originally
+intended as an internal representation that programmers wouldn&rsquo;t manipulate
+directly, but LISP programmers liked writing them and the intended language
+syntax (M-Expressions) was never implemented. Here are some S-expressions:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-scheme">(if x y z)
+
+(* (+ 2 6 4) 3)
+
+(define (f x) (if (= x 0) 1 (* x (f (- x 1)))))
+</pre>
+</div>
+
+<p>
+S-expressions are a simple, convenient way to represent structured
+expressions. Because of their simple structure, they are very easy to represent
+and manipulate inside a compiler or an interpreter.
+</p>
+
+<p>
+Look at the expressions above. What components are there? Ignoring everything we
+might know about what the expressions <i>mean</i> and focusing on how they <i>look</i>, we
+can see three different kinds of expression:
+</p>
+<dl class="org-dl">
+<dt>Symbols</dt><dd>such as <code>f</code> and <code>if</code></dd>
+<dt>Numbers</dt><dd>such as <code>4</code> and <code>0</code></dd>
+<dt>Lists</dt><dd>sequences of other S-Expressions wrapper in parentheses, like <code>(+ 2 6
+   4)</code> or <code>(* (+ 2 6 4) 3)</code></dd>
+</dl>
+</div>
+</div>
+
+<div id="outline-container-orgb4f8aef" class="outline-2">
+<h2 id="orgb4f8aef">S-Expressions in OCaml</h2>
+<div class="outline-text-2" id="text-orgb4f8aef">
+<p>
+How should we represent S-expressions in OCaml? One option would be to use
+strings. So we could have
+</p>
+
+<div class="org-src-container">
+<pre class="src src-ocaml">let e1 = "(if x y z)"
+let e2 = "(* (+ 2 6 4) 3)"
+</pre>
+</div>
+
+<p>
+This representation is convenient to read in: programmers write programs as
+sequences of characters in files. It is, however, very difficult to work
+with. Imagine extending our compiler to support unary operations on numbers (for
+instance, a function that increments a number). Doing so using this string
+representation would be <b>very</b> difficult. We&rsquo;d have to see if the first
+character of the string is a <code>(</code>, then look at the next characters to find the
+operation, then find the argument, and so on. Moreover, we&rsquo;d need to repeat this
+effort for every operation we want to support.
+</p>
+
+<p>
+A better representation for S-expressions will use the structure we talked about
+above. We can add a new type to OCaml to encode this structure, as follows:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-ocaml">type s_exp =
+  Sym of string | Num of int | Lst of s_exp list
+</pre>
+</div>
+
+<p>
+<code>Sym</code>, <code>Num</code>, and <code>Lst</code> are all <i>constructors</i>: ways of building
+s-expressions. So what this type definition is saying is that an s-expression
+can be a symbol <b>or</b> a number <b>or</b> a list.
+</p>
+
+<p>
+The &ldquo;of&rdquo; after each constructor indicates that that constructor is associated
+with some data of a particular type. For instance, the symbol <code>if</code> represented
+as an <code>s_exp</code> looks like <code>Sym "if"</code>; 4000000000000 looks like <code>Num 4000000000000</code>.
+</p>
+
+<p>
+<code>Lst</code> is defined <i>recursively</i>: it takes as its argument a list of other
+s-expressions. These could be build using the <code>Sym</code> or <code>Num</code> constructors or
+using more <code>Lst</code> constructors. So for instance, `(if x y z)` looks like
+</p>
+
+<div class="org-src-container">
+<pre class="src src-ocaml">let e1 = Lst [Sym "if"; Sym "x"; Sym "y"; Sym "z"]
+</pre>
+</div>
+
+<p>
+and <code>(* (+ 2 6 4) 3)</code> looks like
+</p>
+
+<div class="org-src-container">
+<pre class="src src-ocaml">let e2 = Lst [Sym "*"; Lst [Sym "+"; Num 2; Num 6; Num 4]; Num 3]
+</pre>
+</div>
+
+<p>
+We can see that compared to the string representation, which is &ldquo;flat&rdquo;, this
+representation includes the nested structure of s-expressions. We can access
+this structure using <i>pattern matching</i>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-ocaml">let which_constructor (e: s_exp) : string =
+  match e with
+  | Sym x -&gt; "a symbol"
+  | Num n -&gt; "a number"
+  | Lst l -&gt; "a list"
+</pre>
+</div>
+
+<p>
+This looks like a repeated &ldquo;if&rdquo;. The real power of pattern matching is
+<i>destructuring</i>: we can use names defined on the left-hand side of each pattern.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-ocaml">let rec total (e: s_exp) : int =
+  match e with
+  | Sym _ -&gt; 0
+  | Num n -&gt; n
+  | Lst l -&gt; List.fold_left ( + ) 0 (List.map total l)
+</pre>
+</div>
+
+<p>
+For the <code>Lst</code> constructor, it can sometimes be useful to destructure the list as
+well:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-ocaml">let rec has_if (e: s_exp) : bool =
+  match e with
+  | Sym _ -&gt; false
+  | Num _ -&gt; false
+  | Lst (Sym "if" :: _) -&gt; true
+  | Lst l -&gt; List.exists has_if l
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgd3b25bd" class="outline-2">
+<h2 id="orgd3b25bd">S-expressions in our compiler</h2>
+<div class="outline-text-2" id="text-orgd3b25bd">
+<p>
+The course staff has written a small library for S-expressions; HW1, out this week,
+is designed to get you some practice working with this library. The library
+defines the same <code>s_exp</code> type listed above; it also defines functions to
+convert strings to s-expressions.
+</p>
+
+<p>
+If our OCaml project is set up correctly, we can use the library like this:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-ocaml">open S_exp
+
+let e1 = parse "(* (+ 2 6 4) 3)"
+</pre>
+</div>
+
+<p>
+<code>parse</code> takes in a string and returns the corresponding s-expression. Later in
+the course, we will see how this function works.
+</p>
+
+<p>
+The compiler we have developed can be modified to use s-expressions:
+</p>
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 2: </span><code>compile.ml</code></label><pre class="src src-ocaml">open S_exp
+
+let compile (program: s_exp): string =
+  match program with
+  | Num n -&gt;
+    String.concat "\n" 
+    [ "global _entry"; 
+    "_entry:"; 
+    Printf.sprintf "\tmov rax, %d" n;
+    "\tret" ]
+</pre>
+</div>
+
+<p>
+We only support numbers, so we haven&rsquo;t included the other cases. Our OCaml
+editor will complain about this program, saying something about &ldquo;non-exhaustive
+pattern matching&rdquo;; this means that there are some s-expressions that we haven&rsquo;t
+matched. We can &ldquo;fix&rdquo; this error like this:
+</p>
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 3: </span><code>compile.ml</code></label><pre class="src src-ocaml">open S_exp
+
+exception BadExpression of s_exp
+
+let compile (program: s_exp): string =
+  match program with
+  | Num n -&gt;
+    String.concat "\n" 
+    [ "global _entry"; 
+    "_entry:"; 
+    Printf.sprintf "\tmov rax, %d" n;
+    "\tret" ]
+  | e -&gt; raise (BadExpression e)
+</pre>
+</div>
+
+<p>
+Now we will get a somewhat-useful error if we try to compile something that
+isn&rsquo;t a number.
+</p>
+</div>
+</div>
+</div>
+<div id="postamble" class="status">
+<footer>Content by Doug Woos, with modifications by Sarah E. Chasins<br/>Style adapted from <a href="http://taopeng.me/org-notes-style/">org-notes-style</a></footer>
+</div>
+</body>
+</html>

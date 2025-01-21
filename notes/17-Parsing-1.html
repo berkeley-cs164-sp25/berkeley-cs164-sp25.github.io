@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Parsing intro</title>
+    <meta name="generator" content="Org mode" />
+    <meta name="author" content="Sarah E. Chasins" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link href="lecture-notes.css" rel="stylesheet" type="text/css" />
+    <script type="text/javascript">
+      // @license magnet:?xt=urn:btih:e95b018ef3580986a04669f1b5879592219e2a7a&dn=public-domain.txt Public Domain
+      <!--/*--><![CDATA[/*><!--*/
+      function CodeHighlightOn(elem, id) {
+        var target = document.getElementById(id);
+        if (null != target) {
+          elem.classList.add("code-highlighted");
+          target.classList.add("code-highlighted");
+        }
+      }
+      function CodeHighlightOff(elem, id) {
+        var target = document.getElementById(id);
+        if (null != target) {
+          elem.classList.remove("code-highlighted");
+          target.classList.remove("code-highlighted");
+        }
+      }
+      /*]]>*/ //-->
+      // @license-end
+    </script>
+  </head>
+  <body>
+    <div id="preamble" class="status">
+      <div class="alert">
+        <span class="bold">Important:</span> These notes are not designed to
+        subsitute for class sessions. Importantly, they do
+        <span class="ital">not</span> cover all content required for the exams
+        or for implementing HWs. These are just an aid for re-implementing the
+        class compiler, after you've already come to class and completed the
+        in-class activities!
+      </div>
+    </div>
+    <div id="content">
+      <header>
+        <h1 class="title">Parsing intro</h1>
+      </header>
+      <p>
+        Today we&rsquo;re going to take a step back and talk about this parsing
+        thing that keeps coming up. We&rsquo;ve been using a parser this whole
+        time, but what does it actually do? And why do we prefer using the
+        output of a parser, rather than just using the program text as a string?
+      </p>
+
+      <p>
+        Today we&rsquo;re going to be pretty concrete. We&rsquo;ll just work on
+        parsing a particular langauge, the language of S-expressions we&rsquo;ve
+        been using for our Scheme variant. S-expressions are known to be
+        especially easy to parse&#x2014;in fact, that&rsquo;s one of the reasons
+        languages might pick S-expressions as their input of choice. So
+        we&rsquo;ll be able to write a whole S-expression parser from scratch
+        today, and this will help us think about what a parser is actually doing
+        and some of the design guidelines we should keep in mind. Going forward
+        we&rsquo;ll talk about how to parse more complicated languages.
+      </p>
+
+      <figure id="orgc4b8e24">
+        <img src="./imgs/tokenizing-parsing.png" alt="tokenizing-parsing.png" />
+      </figure>
+
+      <p>
+        First let&rsquo;s step back a moment. There are actually two
+        transformation steps on the route from the program text to the
+        tree-structured <code>s_exp</code> inputs we&rsquo;ve been using in the
+        interpreter and compiler. The two transformation steps are (i)
+        tokenization and (ii) parsing. Tokenization transforms a flat string
+        into a flat list of tokens. Parsing transforms a flat list of tokens
+        into a tree that represents the structure of the program. A token might
+        be a paren, a function name, a number. (See some token examples in the
+        image above. The tokens are in all caps by convention.) We&rsquo;ll
+        circle back around to tokenization, but for now let&rsquo;s focus on
+        parsing.
+      </p>
+
+      <p>
+        The first thing we need when we parse a language is a description of
+        what the language looks like:
+      </p>
+
+      <figure id="org28d68f7">
+        <img
+          src="./imgs/s-expression-grammar.png"
+          alt="s-expression-grammar.png"
+        />
+      </figure>
+
+      <p>
+        This is the grammar of S-expressions. We might think to ourselves, hey,
+        we already have this <code>s_exp</code> type in our compiler and
+        interpreter&#x2014;maybe that&rsquo;s a description of how programs
+        look. But it doesn&rsquo;t have quite all the information we need. If we
+        take a look at <code>s_exp</code>, you&rsquo;ll notice some elements are
+        missing that appear in the written programs. For instance, where are all
+        the parens we&rsquo;re always piling into our Scheme programs?
+      </p>
+
+      <div class="org-src-container">
+        <label class="org-src-name"
+          ><span class="listing-number">Listing 1: </span
+          ><code>s_exp/s_exp.ml</code></label
+        >
+        <pre class="src src-ocaml">
+type s_exp = Exp.t = Num of int | Sym of string | Lst of s_exp list
+</pre
+        >
+      </div>
+
+      <p>
+        So our <code>s_exp</code> type isn&rsquo;t a complete description of
+        what programmers are allowed to write in our language. Instead
+        we&rsquo;ll need that grammar. This is a context-free grammar. If you
+        take a theory class, you&rsquo;ll learn much more about what
+        context-free means, and you&rsquo;ll see some examples of grammars that
+        aren&rsquo;t context-free. You&rsquo;ll also learn a lot about the class
+        of languages that context-free grammers can express. We won&rsquo;t be
+        diving deep on that here. We&rsquo;ll be looking just at context-free
+        grammars as a way to describe how programming languages look in their
+        textual form. Grammars a convenient, concise, formal way of writing down
+        what strings the programmers is allowed to feed to a given compiler or
+        interpreter.
+      </p>
+
+      <p>
+        The symbols in angle brackets are <b><b>nonterminals</b></b
+        >. They don&rsquo;t get to appear in the program string, but
+        they&rsquo;re helpful along the way. The other symbols, the ones that
+        aren&rsquo;t nonterminals, are <b><b>terminals</b></b
+        >. Each rule is called a <b><b>production rule</b></b
+        >. Finally, we have to select one of our non-terminal symbols as a
+        special <b><b>start symbol</b></b
+        >. Once we&rsquo;ve decided on the set of nonterminals, the set of
+        terminals, the set of production rules, and the start symbol,
+        we&rsquo;ve completed the definition of a grammar.
+      </p>
+
+      <p>
+        (Note that terminals can be associated with data&#x2013;e.g., the
+        <code>n</code> in <code>NUM (n)</code>. We&rsquo;ll get these from
+        tokenization.)
+      </p>
+
+      <p>
+        We can read each production rule as saying the string of symbols on the
+        left &ldquo;is&rdquo; or &ldquo;is a&rdquo; string of symbols on the
+        right. So from our S-expression grammar, we can say an S-expression is a
+        number or is a symbol or is a left paren followed by an
+        <code>&lt;lst&gt;</code> followed by a right paren.
+      </p>
+
+      <p>
+        We call these production rules because when we read them forward like
+        this, we can use them to <i>produce</i> all the programs allowed in the
+        language. Say we select our start symbol <code>&lt;s_exp&gt;</code>;
+        Using our first production rule, we can produce a very simple program,
+        <code>NUM (2)</code>, which we&rsquo;d write in our language as the
+        program <code>2</code>.
+      </p>
+
+      <p>
+        Here&rsquo;s an example of how we can apply the production rules to
+        create a more interesting program:
+      </p>
+
+      <figure id="org68696c4">
+        <img src="./imgs/parse-tree.png" alt="parse-tree.png" />
+      </figure>
+
+      <p>
+        Notice that the leaves of the tree are all terminals. In contrast, the
+        internal nodes are nonterminals. Take a moment to look at the tree. What
+        program does it produce? (Scroll for answer.)
+      </p>
+
+      <p>
+        <code>(+ 1 2)</code>
+      </p>
+
+      <p>
+        Another way to think of this tree is as a <i>parse tree</i>. We&rsquo;ve
+        just walked through how to run rules forward in order to go from the
+        start symbol to a program in our language. What if instead we want to
+        start with a string and then figure out if it can be interpreted as a
+        program in our language? Say we have the string <code>(+ 1 2)</code>.
+        What would it take to persuade us that it&rsquo;s an S-expression? It
+        would take one of these parse trees! What it means to be part of our
+        language is that there&rsquo;s a way of walking the production rules
+        that produces the target string. In this case, we can see there&rsquo;s
+        a way of walking the production rules that does produce the target
+        string <code>(+ 1 2)</code>, so we know <code>(+ 1 2)</code> is an
+        S-expression.
+      </p>
+
+      <p>
+        This is why we need a grammar in order to write a parser. Coming up with
+        a grammar that correctly describes our target language can be hard.
+        We&rsquo;ll talk more about that process in upcoming class sessions.
+      </p>
+
+      <p>
+        One last thing to notice. We already took a look at our
+        <code>s_exp</code> type and noticed that there are some similarities,
+        even though our <code>s_exp</code> type doesn&rsquo;t have all the
+        details we need for parsing. Even though the type doesn&rsquo;t include
+        <i>all</i> the details, there&rsquo;s definitely an interesting
+        correspondence here:
+      </p>
+
+      <figure id="org2a53ee7">
+        <img
+          src="./imgs/grammar-correspondence.png"
+          alt="grammar-correspondence.png"
+        />
+      </figure>
+
+      <p>
+        We&rsquo;ll use this correspondence to guide the structure of our
+        parser.
+      </p>
+
+      <p>
+        Let&rsquo;s start with our very bad, no good tokenizer. Don&rsquo;t
+        worry about this too much. We&rsquo;re just using it for today so we can
+        jump straight to parsing:
+      </p>
+
+      <div class="org-src-container">
+        <label class="org-src-name"
+          ><span class="listing-number">Listing 2: </span
+          ><code>handparser.ml</code></label
+        >
+        <pre class="src src-ocaml">
+type s_exp = Num of int | Sym of string | Lst of s_exp list
+
+type token = NUM of int | SYM of string | LPAREN | RPAREN
+
+exception ParseError
+
+let token_of_string (s : string) =
+  match s with
+  | "(" -&gt;
+      LPAREN
+  | ")" -&gt;
+      RPAREN
+  | _ -&gt; (
+    try NUM (int_of_string s) with _ -&gt; SYM s )
+
+let tokenize (s : string) =
+  s |&gt; String.split_on_char ' ' |&gt; List.map token_of_string
+
+</pre
+        >
+      </div>
+
+      <p>
+        To start on our parser, we&rsquo;re going to want to construct a couple
+        helper functions. We&rsquo;re going to construct them in a very
+        particular way. For each nonterminal that appears on the left side of
+        our production rules, we&rsquo;ll make one helper. So we&rsquo;ll have
+        one for <code>parse_s_exp</code> and one for <code>parse_lst</code>.
+        They&rsquo;ll both take in a list of tokens. They&rsquo;ll also both
+        output a list of tokens, the tokens that remain to be processed. But
+        they&rsquo;ll have one additional output each. For
+        <code>parse_s_exp</code>, that&rsquo;ll be an S-expression, because
+        that&rsquo;s what it&rsquo;s trying to parse from the input tokens. For
+        <code>parse_lst</code>, it&rsquo;ll be a list of S-expressions, because
+        that&rsquo;s what it&rsquo;s trying to parse from the input tokens.
+      </p>
+
+      <p>Here&rsquo;s how they look:</p>
+
+      <div class="org-src-container">
+        <label class="org-src-name"
+          ><span class="listing-number">Listing 3: </span
+          ><code>handparser.ml</code></label
+        >
+        <pre class="src src-ocaml">
+let rec parse_s_exp (toks : token list) =
+    match toks with
+    | NUM n :: toks2 -&gt;
+	(Num n, toks2)
+    | SYM s :: toks2 -&gt;
+	(Sym s, toks2)
+    | LPAREN :: toks2 -&gt;
+	let exps3, toks3 = parse_lst toks2 in 
+	    (Lst exps3, toks3)
+    | _ -&gt;
+	raise ParseError
+
+and parse_lst (toks : token list) =
+    match toks with
+    | RPAREN :: toks2 -&gt;
+	([], toks2)
+    | _ -&gt;
+	let exp2, toks2 = parse_s_exp toks in 
+	let exps3, toks3 = parse_lst toks2 in 
+	(exp2 :: exps3, toks3)
+
+</pre
+        >
+      </div>
+
+      <p>
+        How have we filled in the bodies of the helper functions? Notice that
+        we&rsquo;re adding a match case for each of the production rules. One of
+        the ways that our grammar is structured really nicely is that all we
+        have to do to figure out which case is relevant is look at the first
+        token in our list of input tokens.
+      </p>
+
+      <p>
+        One interesting thing to notice is the first case in
+        <code>parse_lst</code>. We wanted to look for the empty string, but how
+        would we look for the empty string, since it&rsquo;s just
+        <code>""</code>? Our tokenizer isn&rsquo;t going to produce that for us.
+        Instead we had to think about what would actually appear next if we had
+        an empty list&#x2014;which is to say, a right paren! We were able to
+        figure that out by looking at where <code>&lt;lst&gt;</code> is used on
+        the right side of any prouction rules. In this case,
+        <code>&lt;lst&gt;</code> is used exactly once, in the last production
+        rule that has <code>&lt;s_exp&gt;</code> on the left side:
+        <code>&lt;s_exp&gt; ::= LPAREN &lt;lst&gt; RPAREN</code>. In future
+        class sessions, we&rsquo;ll see how we can use this same approach with
+        other grammars.
+      </p>
+
+      <p>
+        For our second <code>&lt;lst&gt;</code> case, things are a bit simpler.
+        We know from the grammar that we expect to see an
+        <code>&lt;s_exp&gt;</code> and then another <code>&lt;lst&gt;</code>. We
+        already have helper functions for parsing those, so we&rsquo;ll go ahead
+        and call them.
+      </p>
+
+      <p>
+        Now that we have our helper functions, based on our production rules, we
+        can make the <code>parse</code> function itself. That will take care of
+        tokenization, then starting our parsing process based on our start
+        symbol, <code>&lt;s_exp&gt;</code>.
+      </p>
+
+      <div class="org-src-container">
+        <label class="org-src-name"
+          ><span class="listing-number">Listing 4: </span
+          ><code>handparser.ml</code></label
+        >
+        <pre class="src src-ocaml">
+let parse (s : string) =
+  let toks = tokenize s in
+  let exp, l = parse_s_exp toks in
+  if List.length l = 0 then exp else raise ParseError
+</pre
+        >
+      </div>
+
+      <p>
+        Finally, what should we do in the case where we parsed an S-expression
+        from the start of our token list, but we had some tokens left over? This
+        would happen if we input a program like <code>( + 1 2 ) 3</code>.
+        That&rsquo;s not the kind of input our compiler and interpreter accept,
+        so we&rsquo;ll make this case raise a <code>ParseError</code>.
+      </p>
+
+      <p>
+        So that&rsquo;s our whirlwind tour of how to write a parser, and in
+        particular how to generate the structure of a parser from a grammar.
+        This worked so cleanly becuase S-expressions have such a nicely
+        structured grammar. For other grammars, we&rsquo;ll have to do more
+        work. We&rsquo;ll be talking more about this soon.
+      </p>
+    </div>
+    <div id="postamble" class="status">
+      <footer>
+        Content by Doug Woos, with modifications by Sarah E. Chasins<br />Style
+        adapted from
+        <a href="http://taopeng.me/org-notes-style/">org-notes-style</a>
+      </footer>
+    </div>
+  </body>
+</html>

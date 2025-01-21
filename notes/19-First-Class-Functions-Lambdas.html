@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lambdas</title>
+    <meta name="generator" content="Org mode" />
+    <meta name="author" content="Sarah E. Chasins" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link href="lecture-notes.css" rel="stylesheet" type="text/css" />
+    <script type="text/javascript">
+      // @license magnet:?xt=urn:btih:e95b018ef3580986a04669f1b5879592219e2a7a&dn=public-domain.txt Public Domain
+      <!--/*--><![CDATA[/*><!--*/
+      function CodeHighlightOn(elem, id) {
+        var target = document.getElementById(id);
+        if (null != target) {
+          elem.classList.add("code-highlighted");
+          target.classList.add("code-highlighted");
+        }
+      }
+      function CodeHighlightOff(elem, id) {
+        var target = document.getElementById(id);
+        if (null != target) {
+          elem.classList.remove("code-highlighted");
+          target.classList.remove("code-highlighted");
+        }
+      }
+      /*]]>*/ //-->
+      // @license-end
+    </script>
+  </head>
+  <body>
+    <div id="preamble" class="status">
+      <div class="alert">
+        <span class="bold">Important:</span> These notes are not designed to
+        subsitute for class sessions. Importantly, they do
+        <span class="ital">not</span> cover all content required for the exams
+        or for implementing HWs. These are just an aid for re-implementing the
+        class compiler, after you've already come to class and completed the
+        in-class activities!
+      </div>
+    </div>
+    <div id="content">
+      <header>
+        <h1 class="title">Lambdas</h1>
+      </header>
+      <nav id="table-of-contents">
+        <h2>Table of Contents</h2>
+        <div id="text-table-of-contents">
+          <ul>
+            <li><a href="#org6f22697">Anonymous functions</a></li>
+            <li>
+              <a href="#orge0944c4">Closures</a>
+              <ul>
+                <li><a href="#org56bcdc6">Closures in the interpreter</a></li>
+                <li><a href="#org4e7eb63">Closures in the compiler</a></li>
+              </ul>
+            </li>
+          </ul>
+        </div>
+      </nav>
+      <p>After last class, we can run programs like this:</p>
+
+      <div class="org-src-container">
+        <pre class="src src-lisp">
+(define (range lo hi)
+  (if (&lt; lo hi)
+   (pair lo (range (add1 lo) hi))
+   false))
+(define (map f l)
+  (if (not l) l
+  (pair (f (left l)) (map f (right l)))))
+(define (g x) (+ x 1))
+(print (map g (range 0 2)))
+</pre
+        >
+      </div>
+
+      <p>Very cool! We can implement <code>map</code> in our language!</p>
+
+      <p>Q: What will be the output from running this program?</p>
+
+      <p>
+        But, hey, it&rsquo;s kind of annoying that we had to define this
+        <code>g</code> function at the top level. Normally when we&rsquo;re
+        using <code>map</code>, we just make a little anonymous function right
+        where we&rsquo;re calling <code>map</code>. We&rsquo;d really like our
+        program to look more like this:
+      </p>
+
+      <div class="org-src-container">
+        <pre class="src src-lisp">
+(define (range lo hi)
+  (if (&lt; lo hi)
+   (pair lo (range (add1 lo) hi))
+   false))
+(define (map f l)
+  (if (not l) l
+  (pair (f (left l)) (map f (right l)))))
+(print (map (lambda (x) (+ x 1)) (range 0 2)))
+</pre
+        >
+      </div>
+
+      <p>
+        What would it take to add support for this in our language? Possibly
+        less effort than you&rsquo;d think! Think about how similar the first
+        and second program are. What if every time we see a program like the
+        second one, we transform it into one that looks like the first? Once we
+        see a lambda, or <i>anonymous function</i>, we can add a new definition
+        to our list of top-level definitions. We&rsquo;ll give it a special name
+        that programmer-defined functions aren&rsquo;t allowed to use. Then once
+        our new definition is available in our usual list of top-level
+        definitions, we can use it the same way we&rsquo;ve used our definitions
+        before&#x2014; by putting the appropriate function name where we
+        previously had the lambda itself. Let&rsquo;s take a look at how this
+        works.
+      </p>
+
+      <div id="outline-container-org6f22697" class="outline-2">
+        <h2 id="org6f22697">Anonymous functions</h2>
+        <div class="outline-text-2" id="text-org6f22697">
+          <p>
+            Here&rsquo;s the coolest thing about how we&rsquo;re going to do
+            this: We&rsquo;re not going to change <code>compile.ml</code> or
+            <code>interp.ml</code> at all! Remember that
+            <code>compile.ml</code> and <code>interp.ml</code> already have all
+            the functionality we need to run programs that look like the first
+            program above. So if we can transform the AST before the AST even
+            reaches the compiler or the interpreter, we don&rsquo;t need to
+            extend the compiler or interpreter at all. We&rsquo;ll just
+            transform every AST that uses the new feature into an equivalent AST
+            that only uses the old features. This is sometimes called
+            &ldquo;syntactic sugar,&rdquo; because it gives us a sweeter syntax
+            for writing programs that we could already write even without the
+            sugar!
+          </p>
+
+          <p>
+            To do this, we&rsquo;re going to need to make a new type that will
+            look a lot like <code>expr</code>, our existing type for ASTs.
+            We&rsquo;ll call the new type <code>expr_lam</code> (lam for
+            lambdas). <code>expr</code> will stay the same as always, but
+            <code>expr_lam</code> will include lambda uses. Our plan is to parse
+            programs into the new type, <code>expr_lam</code>. Then we&rsquo;ll
+            write a transformer for turning things of type
+            <code>expr_lam</code> into things of type <code>expr</code> (which
+            doesn&rsquo;t include lambdas). (Remember, our interpreter and
+            compiler only know about things of type <code>expr</code>! They
+            don&rsquo;t know anything about <code>expr_lam</code>. So we better
+            produce something of type <code>expr</code> at the end.)
+          </p>
+
+          <p>
+            Let&rsquo;s start by copying the <code>expr</code> type, replacing
+            all uses of <code>expr</code> in the constructors with uses of
+            <code>expr_lam</code> and adding a constructor for
+            <code>Lambda</code>.
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 1: </span
+              ><code>ast_lam.ml</code></label
+            >
+            <pre class="src src-ocaml">
+type expr_lam =
+  | Prim0 of prim0
+  | Prim1 of prim1 * expr_lam
+  | Prim2 of prim2 * expr_lam * expr_lam
+  | Let of string * expr_lam * expr_lam
+  | If of expr_lam * expr_lam * expr_lam
+  | Do of expr_lam list
+  | Num of int
+  | Var of string
+  | Call of expr_lam * expr_lam list
+  | True
+  | False
+  | Lambda of string list * expr_lam
+</pre
+            >
+          </div>
+
+          <p>
+            Then let&rsquo;s write our translator for translating from
+            <code>expr_lam</code> to <code>expr</code>:
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 2: </span
+              ><code>ast_lam.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let rec expr_of_expr_lam (defns : defn list ref) : expr_lam -&gt; expr = function
+  | Num x -&gt;
+      Num x
+  | Var s -&gt;
+      Var s
+  | True -&gt;
+      True
+  | False -&gt;
+      False
+  | If (test_exp, then_exp, else_exp) -&gt;
+      If
+	( expr_of_expr_lam defns test_exp
+	, expr_of_expr_lam defns then_exp
+	, expr_of_expr_lam defns else_exp )
+  | Let (var, exp, body) -&gt;
+      Let (var, expr_of_expr_lam defns exp, expr_of_expr_lam defns body)
+  | Prim0 p -&gt;
+      Prim0 p
+  | Prim1 (p, e) -&gt;
+      Prim1 (p, expr_of_expr_lam defns e)
+  | Prim2 (p, e1, e2) -&gt;
+      Prim2 (p, expr_of_expr_lam defns e1, expr_of_expr_lam defns e2)
+  | Do exps -&gt;
+      Do (List.map (expr_of_expr_lam defns) exps)
+  | Call (exp, args) -&gt;
+      Call (expr_of_expr_lam defns exp, List.map (expr_of_expr_lam defns) args)
+  | Lambda (args, body) -&gt;
+      let name = gensym "_lambda" in
+      defns := {name; args; body= expr_of_expr_lam defns body} :: !defns ;
+      Var name
+</pre
+            >
+          </div>
+
+          <p>
+            Now most of this may look like it&rsquo;s doing almost nothing, but
+            in fact when we see something constructed with the
+            <code>expr_lam</code> <code>Num</code> constructor, we&rsquo;re
+            calling the <code>expr</code> <code>Num</code> constructor, so even
+            the boring cases are doing important work. But the most interesting
+            case is the <code>Lambda</code> case. Here we see that we&rsquo;re
+            generating a new name for the (previously) anonymous function. Then
+            we&rsquo;re adding the definition directly to our existing list of
+            <code>defns</code>. Finally, we replace the lambda expression with a
+            use of the newly created name.
+          </p>
+
+          <p>
+            And that&rsquo;s it! We&rsquo;ve added anonymous functions to our
+            language, for both the interpreter and the compiler. Before our
+            compilation process was: string -&gt; tokens -&gt; AST -&gt;
+            assembly. Now our compilation process is: string -&gt; tokens -&gt;
+            AST with lambdas -&gt; AST without lambdas -&gt; assembly. This was
+            a pretty simple transformation, but it gives you a sense of how AST
+            to AST translation works. In an industrial compiler, you&rsquo;ll
+            often have many layers of AST to AST transformations.
+          </p>
+        </div>
+      </div>
+
+      <div id="outline-container-orge0944c4" class="outline-2">
+        <h2 id="orge0944c4">Closures</h2>
+        <div class="outline-text-2" id="text-orge0944c4">
+          <p>
+            Ok, that&rsquo;s all well and good, but what about this program?
+          </p>
+
+          <div class="org-src-container">
+            <pre class="src src-lisp">
+(print 
+  (let ((x 2)) 
+    ((lambda (y) (+ y x)) 3)
+  )
+)
+</pre
+            >
+          </div>
+
+          <p>Q: What should this produce?</p>
+
+          <p>
+            Q: Why won&rsquo;t it work with our current interpreter and
+            compiler?
+          </p>
+
+          <p>
+            The problem is, say we take this lambda and hoist it to the top of
+            our program, as our transformation does. We can even do it manually
+            on paper. If we do this, how will we know what <code>x</code> should
+            be when we run the function?
+          </p>
+
+          <p>
+            It makes sense that this is a limitation of our approach. If the
+            context in which we&rsquo;re defining the lambda doesn&rsquo;t
+            matter, then we can hoist it to the top level without issue. But if
+            it <i>does</i> matter, what now?
+          </p>
+        </div>
+
+        <div id="outline-container-org56bcdc6" class="outline-3">
+          <h3 id="org56bcdc6">Closures in the interpreter</h3>
+          <div class="outline-text-3" id="text-org56bcdc6">
+            <p>Let&rsquo;s start by fixing this in the interpreter.</p>
+
+            <p>
+              First, we&rsquo;ll add a constructor to our
+              <code>expr</code> type:
+            </p>
+
+            <div class="org-src-container">
+              <label class="org-src-name"
+                ><span class="listing-number">Listing 3: </span
+                ><code>ast.ml</code></label
+              >
+              <pre class="src src-ocaml">
+type expr =
+ (* some constructors elided *)
+ | Closure of string
+</pre
+              >
+            </div>
+
+            <p>
+              And we&rsquo;ll start using that constructor whenever we find a
+              lambda in our program:
+            </p>
+
+            <div class="org-src-container">
+              <label class="org-src-name"
+                ><span class="listing-number">Listing 4: </span
+                ><code>ast.ml</code></label
+              >
+              <pre class="src src-ocaml">
+let rec expr_of_expr_lam (defns : defn list ref) : expr_lam -&gt; expr = function
+  (* some cases elided)
+    | Lambda (args, body) -&gt;
+      let name = gensym "_lambda" in
+      defns := {name; args; body= expr_of_expr_lam defns body} :: !defns ;
+      Closure name
+</pre
+              >
+            </div>
+
+            <p>
+              Why closure? Well, what we&rsquo;re going to do when we see a
+              lambda in our interpreter is grab the appropriate name for
+              retrieving the definition from our list of definitions
+              <b>but also</b>
+              <i
+                >save the environment that existed when the lambda was
+                created</i
+              >. Remember, when we encounter the lambda in the interpreter,
+              we&rsquo;re in an environment where all the symbols we need are
+              mapped to their values. That&rsquo;s exactly the information
+              we&rsquo;ll need when we&rsquo;re ready to run the function body!
+              A closure <i>encloses</i> or packages up a function and an
+              environment to use for the function. So now we&rsquo;ve set it up
+              so that our ASTs have closures in all the places where we&rsquo;ll
+              want to save a function with its environment.
+            </p>
+
+            <p>Let&rsquo;s move on to actually changing the interpreter.</p>
+
+            <p>
+              First, we know that we want to start storing more things in our
+              function values, so let&rsquo;s change our value type:
+            </p>
+
+            <div class="org-src-container">
+              <label class="org-src-name"
+                ><span class="listing-number">Listing 5: </span
+                ><code>interp.ml</code></label
+              >
+              <pre class="src src-ocaml">
+type value = Number of int 
+  | Boolean of bool 
+  | Pair of (value * value)
+  | Function of (string * value symtab)
+</pre
+              >
+            </div>
+
+            <p>
+              Now we&rsquo;re ready to change a couple cases in
+              <code>interp_exp</code> to make this new type of function value:
+            </p>
+
+            <div class="org-src-container">
+              <label class="org-src-name"
+                ><span class="listing-number">Listing 6: </span
+                ><code>interp.ml</code></label
+              >
+              <pre class="src src-ocaml">
+let rec interp_exp (defns : defn list) (env : value symtab) (exp : expr) : value
+    =
+  match exp with
+(* some cases elided *)
+  | Var var when is_defn defns var -&gt;
+      Function (var, Symtab.empty)
+  | Closure f -&gt;
+      Function (f, env)
+</pre
+              >
+            </div>
+
+            <p>
+              These are the only cases where we need to make function values, so
+              these are the only cases we need to change (in the
+              <code>Var</code> case) or introduce (in the
+              <code>Closure</code> case). In the <code>Var</code> case,
+              we&rsquo;re just seeing the same thing we always used to see when
+              we called functions. Someone used a name that appears in our list
+              of definitions. So we know that&rsquo;s at the top level, and we
+              don&rsquo;t need to save the context. We&rsquo;ll just use an
+              empty environment for that function value.
+            </p>
+
+            <p>
+              The <code>Closure</code> case is the exciting case, the AST node
+              that we&rsquo;ve introduced specifically for anonymous functions.
+              In this case, we&rsquo;ll want to save <code>f</code>, which is
+              the new name we gave the anonymous function. But we&rsquo;ll also
+              want to save <code>env</code>, which is the environment that was
+              passed as an argument to <code>interp_exp</code>. Which is to say,
+              it&rsquo;s the context in which the lambda was created. So we make
+              a function value with <code>Function (f, env)</code>.
+            </p>
+
+            <p>Now we&rsquo;re ready to use our new function values!</p>
+
+            <p>
+              We still want to make sure that the thing we&rsquo;re calling is
+              actually a function value. But the function value is now carrying
+              some extra information, the environment that we&rsquo;ve packaged
+              up with it. How should we use that information?
+            </p>
+
+            <div class="org-src-container">
+              <label class="org-src-name"
+                ><span class="listing-number">Listing 7: </span
+                ><code>interp.ml</code></label
+              >
+              <pre class="src src-ocaml">
+let rec interp_exp (defns : defn list) (env : value symtab) (exp : expr) : value
+    =
+  match exp with
+  | Call (f, args) -&gt; (
+      let vals = args |&gt; List.map (interp_exp defns env) in
+      let fv = interp_exp defns env f in 
+      match fv with
+      | Function (name, saved_env) when is_defn defns name -&gt;
+	  let defn = get_defn defns name in
+	  if List.length args = List.length defn.args then
+	    let fenv =
+	      List.combine defn.args vals |&gt; Symtab.add_list saved_env
+	    in
+	    interp_exp defns fenv defn.body
+	  else raise (BadExpression exp)
+      | _ -&gt; raise (BadExpression exp)
+  )
+</pre
+              >
+            </div>
+
+            <p>
+              Notice that we&rsquo;re adding the values from
+              <code>saved_env</code> into the existing <code>env</code>, so that
+              all relevant context is available while we&rsquo;re running the
+              anonymous function.
+            </p>
+
+            <p>
+              And now our anonymous function that uses values from the outside
+              world works!
+            </p>
+          </div>
+        </div>
+
+        <div id="outline-container-org4e7eb63" class="outline-3">
+          <h3 id="org4e7eb63">Closures in the compiler</h3>
+          <div class="outline-text-3" id="text-org4e7eb63">
+            <p>
+              This is looking pretty tough for our compiler. In the interpreter,
+              we have this nice symbol table that we can tote around. It may
+              look like we didn&rsquo;t actually change the function values that
+              much in the interpreter, but adding a symbol table is actually a
+              lot! That&rsquo;s a whole balanced binary tree that we stuffed in
+              there! We suddenly started carrying <i>a lot</i> of information
+              with our function values. And it&rsquo;s not clear how to do the
+              same thing in the compiler. After all, the compiler&rsquo;s symbol
+              table only exists at compile time. It doesn&rsquo;t exist at run
+              time at all!
+            </p>
+
+            <p>
+              One insight that will help us out here: we don&rsquo;t need the
+              whole symbol table.
+            </p>
+
+            <p>Take a look at our example from before:</p>
+            <div class="org-src-container">
+              <pre class="src src-lisp">
+(print 
+  (let ((x 2)) 
+    ((lambda (y) (+ y x)) 3)
+  )
+)
+</pre
+              >
+            </div>
+
+            <p>
+              Our lambda doesn&rsquo;t need everything&#x2014;it needs
+              <code>x</code>! And we can tell that just from looking at the
+              lambda. If we look through the lambda, <code>x</code> is the only
+              thing that gets referenced without being defined.
+            </p>
+
+            <p>
+              Variables that an expression uses but doesn&rsquo;t define are
+              called <i>free variables</i>. So from the example above,
+              we&rsquo;d say <code>x</code> is free in
+              <code>(lambda (y) (+ y x))</code>. We&rsquo;ll want to package up
+              not <i>all</i> our variables but just the free variables.
+            </p>
+
+            <p>
+              Q: What&rsquo;s free in this expression?
+              <code>(lambda (y) (+ y y))</code>
+            </p>
+
+            <p>
+              Q: What&rsquo;s free in this expression?
+              <code>(lambda (y) (+ x y))</code>
+            </p>
+
+            <p>
+              Q: What&rsquo;s free in this expression?
+              <code>(print ((adder 2) 3))</code>
+            </p>
+
+            <p>
+              Q: What&rsquo;s free in this expression? <code>(f a b c d)</code>
+            </p>
+
+            <p>
+              Which variables are free really depends on the context! As PL
+              researcher [Brigitte Pientka][<a
+                href="https://www.cs.mcgill.ca/~bpientka/"
+                >https://www.cs.mcgill.ca/~bpientka/</a
+              >] once said in answer to a question about how her system handled
+              free variables, without missing a beat: &ldquo;I don&rsquo;t
+              believe in free variables. Even birds are chained to the
+              sky.&rdquo; It&rsquo;s not that our free variables are truly free!
+              They have some definition. Those definitions are just outside the
+              expression. It&rsquo;s that they&rsquo;re going to depend on the
+              context.
+            </p>
+
+            <p>
+              So the free variables are the ones for which we need to keep
+              context. Let&rsquo;s start by figuring out which variables are
+              free inside a given lambda. Remember, we can tell which of them
+              are free just by looking at the lambda itself.
+            </p>
+
+            <p>
+              Here&rsquo;s our helper function for identifying which variables
+              are free in a given lambda:
+            </p>
+
+            <div class="org-src-container">
+              <label class="org-src-name"
+                ><span class="listing-number">Listing 8: </span
+                ><code>compile.ml</code></label
+              >
+              <pre class="src src-ocaml">
+let rec fv (bound : string list) (exp : expr) =
+  match exp with
+  | Var s when not (List.mem s bound) -&gt;
+      [s]
+  | Let (v, e, body) -&gt;
+      fv bound e @ fv (v :: bound) body
+  | If (te, the, ee) -&gt;
+      fv bound te @ fv bound the @ fv bound ee
+  | Do es -&gt;
+      List.concat_map (fv bound) es
+  | Call (exp, args) -&gt;
+      fv bound exp @ List.concat_map (fv bound) args
+  | Prim1 (_, e) -&gt;
+      fv bound e
+  | Prim2 (_, e1, e2) -&gt;
+      fv bound e1 @ fv bound e2
+  | _ -&gt;
+      []
+</pre
+              >
+            </div>
+
+            <p>
+              Here&rsquo;s what you should notice about <code>fv</code> (<code
+                >fv</code
+              >
+              for free variables). The second argument is an <code>expr</code>,
+              which represents the body of the lambda we&rsquo;re analyzing. The
+              other argument, <code>bound</code> is a list of bound variables.
+              When we first call <code>fv</code>, these are the arguments to the
+              lambda. Later we may add other items. (Note that the
+              <code>Let</code> case adds a new item to bound list for when we
+              traverse the body of the let.) Our goal is to identify all
+              variables that are referenced but not defined, so if we see a case
+              where we use <code>Var s</code> and it&rsquo;s not in
+              <code>bound</code>, we&rsquo;ll add <code>s</code> to our list of
+              free variables. On the other hand, if we see a case where we use
+              <code>Var s</code> and it <i>is</i> in bound, it&rsquo;s not a
+              free variable, and we also don&rsquo;t need to make a recursive
+              call to <code>fv</code>, so we don&rsquo;t even have a case for
+              that. For most of our cases, we&rsquo;re just making the recursive
+              calls and joining together the lists of free variables we get from
+              each recursive call.
+            </p>
+
+            <p>
+              Now what should we do when it comes time to actually compile one
+              of these lambdas? That&rsquo;s what we need to decide to implement
+              our <code>Closure</code> case in <code>compile_exp</code>. We
+              already have a way of using the name to get a function pointer for
+              cases where the function had a top-level definition:
+            </p>
+
+            <div class="org-src-container">
+              <label class="org-src-name"
+                ><span class="listing-number">Listing 9: </span
+                ><code>compile.ml</code></label
+              >
+              <pre class="src src-ocaml">
+let rec compile_exp (defns : defn list) (tab : int symtab) (stack_index : int)
+     (exp : expr) (is_tail : bool) : directive list =
+   match exp with
+   (* some cases elided *)
+  | Var var when is_defn defns var -&gt;
+       [
+	 LeaLabel (Reg Rax, defn_label var)
+	 ; Or (Reg Rax, Imm fn_tag)
+       ]
+</pre
+              >
+            </div>
+
+            <p>
+              We can reuse that approach for grabbing a function pointer when we
+              encounter a closure. But what else will we need? Well, remember
+              that all we have to do to figure out what variables are free in an
+              expression is look at the expression itself. And when we&rsquo;re
+              compiling a lambda, we can look in our <code>defns</code> list and
+              know exactly what expression we&rsquo;ll be using. So we can
+              figure out the list of free variables at compile time. Which means
+              we can go ahead and storage a package of the function pointer and
+              the values of the
+              <i
+                >the fixed, finite set of free variables the function will
+                need</i
+              >. The values themselves are not fixed, but the set of free
+              variables <i>is</i> fixed.
+            </p>
+
+            <p>Let&rsquo;s look back at our sample program again:</p>
+
+            <div class="org-src-container">
+              <pre class="src src-lisp">
+(print 
+  (let ((x 2)) 
+    ((lambda (y) (+ y x)) 3)
+  )
+)
+</pre
+              >
+            </div>
+
+            <p>
+              At this point, we&rsquo;ve transformed it into something like
+              this:
+            </p>
+            <div class="org-src-container">
+              <pre class="src src-lisp">
+(define (_lambda_1 y) (+ y x))
+(print 
+  (let ((x 2)) 
+    (_lambda_1 3)
+  )
+)
+</pre
+              >
+            </div>
+
+            <p>
+              So for this program, we&rsquo;ll put together a package of the
+              pointer to
+              <code>_lambda_1</code> and the value 2, which was the value of
+              <code>x</code> when we created the lambda. And then we just need
+              to make sure that this package is available when we call the
+              lambda.
+            </p>
+
+            <p>
+              Whiteboard: Try drawing a picture of how this should look at run
+              time. We&rsquo;ll put this package of values, this function value,
+              on the heap. In the first free cell of the heap, put the function
+              pointer&#x2014;the address of the first instruction of
+              <code>_lambda_1</code>. (This is the same kind of function pointer
+              we&rsquo;ve already been using.) In the second free cell of the
+              heap, put the value of <code>x</code>, which is 2. (In our runtime
+              representation, 8.) This two-cell block of the heap (more cells if
+              we have more free variables) represents our lambda. When we call
+              the lambda, we need to have a pointer to this block. So
+              we&rsquo;ll add an additional argument to the stack, when we make
+              a call! Remember that we&rsquo;re calling
+              <code>_lambda_1</code> on 3, so we&rsquo;ll have to put the
+              runtime representation of 3 (12) on the first slot of the stack.
+              After that, we&rsquo;ll add an extra argument, which is the
+              pointer to our lambda, and we&rsquo;ll put that in the next
+              available slot on the stack.
+            </p>
+
+            <p>
+              Then the function itself needs to handle moving free variables
+              from the heap onto the appropriate places on the stack. (Where
+              appropriate means the places where the already-compiled body of
+              <code>_lambda_1</code> knows to look for them, relative to the
+              <code>rsp</code> when we enter <code>_lambda_1</code>.)
+            </p>
+
+            <p>So here&rsquo;s what our closure case will do:</p>
+
+            <div class="org-src-container">
+              <label class="org-src-name"
+                ><span class="listing-number">Listing 10: </span
+                ><code>compile.ml</code></label
+              >
+              <pre class="src src-ocaml">
+let rec compile_exp (defns : defn list) (tab : int symtab) (stack_index : int)
+     (exp : expr) (is_tail : bool) : directive list =
+   match exp with
+   (* some cases elided *)
+    | Closure f -&gt;
+       let defn = get_defn defns f in
+       let fvs = fv (List.map (fun d -&gt; d.name) defns @ defn.args) defn.body in
+       let fv_movs =
+	 List.mapi
+	   (fun i var -&gt;
+	     [ Mov (Reg Rax, stack_address (Symtab.find var tab))
+	     ; Mov (MemOffset (Reg Rdi, Imm (8 * (i + 1))), Reg Rax) ])
+	   fvs
+       in
+       if List.exists (fun v -&gt; not (Symtab.mem v tab)) fvs then
+	 raise (BadExpression exp)
+       else
+	 [ LeaLabel (Reg Rax, defn_label f)
+	 ; Mov (MemOffset (Reg Rdi, Imm 0), Reg Rax) ]
+	 @ List.concat fv_movs
+	 @ [ Mov (Reg Rax, Reg Rdi)
+	   ; Or (Reg Rax, Imm fn_tag)
+	   ; Add (Reg Rdi, Imm (8 * (List.length fvs + 1))) ]
+</pre
+              >
+            </div>
+
+            <p>
+              First, grab the definition based on the name, <code>f</code>.
+              Next, figure out the list of free variables, which we call
+              <code>fvs</code>. The assembly instructions in
+              <code>fv_movs</code> are in charge of moving the values of the
+              free variables onto the heap. At compile time, we use the symbol
+              table to figure out where the value of the free variable will be
+              stored at run time. Then we emit the <code>mov</code> instruction
+              that will grab the value from that slot and put it into
+              <code>rax</code>. Then we emit the <code>mov</code> instruction
+              that grabs the value from <code>rax</code> and puts it on the
+              heap.
+            </p>
+
+            <p>
+              We use <code>LeaLabel</code> to get the function pointer, and we
+              put that on the heap too. (We get the function pointer the same
+              way as before, in our <code>Var</code> case. The difference is
+              that now we&rsquo;re putting it on the heap.) Finally, with our
+              last three instructions, we make a pointer to the package
+              we&rsquo;ve put on the heap, save that in <code>rax</code>, and
+              then update our heap pointer.
+            </p>
+
+            <p>
+              Now, when the time comes to make a call, we better be calling one
+              of these function values! So let&rsquo;s take a look at our
+              <code>Call</code> cases. Remember, we have one for
+              <code>is_tail</code> and one for <code>not is_tail</code>.
+            </p>
+
+            <div class="org-src-container">
+              <label class="org-src-name"
+                ><span class="listing-number">Listing 11: </span
+                ><code>compile.ml</code></label
+              >
+              <pre class="src src-ocaml">
+let rec compile_exp (defns : defn list) (tab : int symtab) (stack_index : int)
+    (exp : expr) (is_tail : bool) : directive list =
+  match exp with
+  | Call (f, args) when not is_tail -&gt;
+      let stack_base = align_stack_index (stack_index + 8) in
+      let compiled_args =
+	args
+	|&gt; List.mapi (fun i arg -&gt;
+	       compile_exp defns tab (stack_base - (8 * (i + 2))) arg false
+	       @ [Mov (stack_address (stack_base - (8 * (i + 2))), Reg Rax)])
+	|&gt; List.concat
+      in
+      compiled_args
+      @ compile_exp defns tab
+	  (stack_base - (8 * (List.length args + 2)))
+	  f false
+      @ ensure_fn (Reg Rax)
+      @ [ Mov
+	    (stack_address (stack_base - (8 * (List.length args + 2))), Reg Rax)
+	; Sub (Reg Rax, Imm fn_tag)
+	; Mov (Reg Rax, MemOffset (Reg Rax, Imm 0)) ]
+      @ [ Add (Reg Rsp, Imm stack_base)
+	; ComputedCall (Reg Rax)
+	; Sub (Reg Rsp, Imm stack_base) ]
+  | Call (f, args) when is_tail -&gt;
+      let compiled_args =
+	args
+	|&gt; List.mapi (fun i arg -&gt;
+	       compile_exp defns tab (stack_index - (8 * i)) arg false
+	       @ [Mov (stack_address (stack_index - (8 * i)), Reg Rax)])
+	|&gt; List.concat
+      in
+      let moved_args =
+	args
+	|&gt; List.mapi (fun i _ -&gt;
+	       [ Mov (Reg R8, stack_address (stack_index - (8 * i)))
+	       ; Mov (stack_address ((i + 1) * -8), Reg R8) ])
+	|&gt; List.concat
+      in
+      compiled_args
+      @ compile_exp defns tab (stack_index - (8 * List.length args)) f false
+      @ ensure_fn (Reg Rax) @ moved_args 
+      @ [ Mov (stack_address ((List.length args + 1) * -8), Reg Rax)
+	; Sub (Reg Rax, Imm fn_tag)
+	; Mov (Reg Rax, MemOffset (Reg Rax, Imm 0)) ]
+      @ [ComputedJmp (Reg Rax)]
+</pre
+              >
+            </div>
+
+            <p>
+              Most of this isn&rsquo;t so different from what we were already
+              doing for ~Call~s. We need to compile the arguments. We need to
+              put them on the stack. But after that, we add one more argument,
+              right after the standard arguments: the pointer to that lambda
+              package that we put on the heap.
+            </p>
+
+            <p>
+              Using that pointer, we can also grab the address of the first
+              instruction of the function, which we use for our
+              <code>ComputedJmp</code>. So the only new thing we&rsquo;ve done
+              is emit assembly to add this pointer to the function package as a
+              final argument of our function.
+            </p>
+
+            <p>
+              Which means we have one last thing to do! The part of the compiler
+              that emits code for each function definition has to be ready to
+              actually use these function value packages. So we&rsquo;ll need to
+              update each compiled function definition to grab the values it
+              needs from the heap.
+            </p>
+
+            <p>Here&rsquo;s our old <code>compile_defn</code>:</p>
+
+            <div class="org-src-container">
+              <label class="org-src-name"
+                ><span class="listing-number">Listing 12: </span
+                ><code>compile.ml</code></label
+              >
+              <pre class="src src-ocaml">
+let compile_defn defns defn =
+  let ftab =
+    defn.args |&gt; List.mapi (fun i arg -&gt; (arg, -8 * (i + 1))) |&gt; Symtab.of_list
+  in
+  [Align 8; Label (defn_label defn.name)]
+  @ compile_exp defns ftab (-8 * (List.length defn.args + 1)) defn.body true
+  @ [Ret]
+</pre
+              >
+            </div>
+
+            <p>Here&rsquo;s our updated <code>compile_defn</code>:</p>
+
+            <div class="org-src-container">
+              <label class="org-src-name"
+                ><span class="listing-number">Listing 13: </span
+                ><code>compile.ml</code></label
+              >
+              <pre class="src src-ocaml">
+let compile_defn defns defn =
+  let fvs = fv (List.map (fun d -&gt; d.name) defns @ defn.args) defn.body in
+  let ftab =
+    defn.args @ fvs
+    |&gt; List.mapi (fun i arg -&gt; (arg, -8 * (i + 1)))
+    |&gt; Symtab.of_list
+  in
+  let fvs_to_stack =
+    [ Mov (Reg Rax, stack_address (-8 * (List.length defn.args + 1)))
+    ; Sub (Reg Rax, Imm fn_tag)
+    ; Add (Reg Rax, Imm 8) ]
+    @ List.concat
+	(List.mapi
+	   (fun i _ -&gt;
+	     [ Mov (Reg R8, MemOffset (Reg Rax, Imm (i * 8)))
+	     ; Mov (stack_address (-8 * (List.length defn.args + 1 + i)), Reg R8)
+	     ])
+	   fvs)
+  in
+  [Align 8; Label (defn_label defn.name)]
+  @ fvs_to_stack
+  @ compile_exp defns ftab (-8 * (Symtab.cardinal ftab + 1)) defn.body true
+  @ [Ret]
+</pre
+              >
+            </div>
+
+            <p>
+              What&rsquo;s changed? Well the old version made <code>ftab</code>,
+              our function&rsquo;s symbol table, by mapping each function
+              argument to an offset on the stack. Then we emitted a label, then
+              emitted the assembly for the function (comipled with
+              <code>compile_exp</code>, using our new <code>ftab</code>), and
+              finally we emitted the <code>ret</code>.
+            </p>
+
+            <p>
+              Our new version calls <code>fv</code> on the function body to get
+              the list of free variables. Then we use
+              <b>both <code>defn.args</code> and <code>fv</code></b> to make our
+              new symbol table (<code>let ftab = defn.args @ fvs...</code>).
+              We&rsquo;re assuming that we&rsquo;ll have the normal funciton
+              arguments on the stack, followed by the variables that are free in
+              the definition body. And then we emit the code that takes care of
+              putting those free variables in the right spots.
+            </p>
+
+            <p>
+              Remember, the <code>Call</code> cases of
+              <code>compile_exp</code> are in charge of putting the function
+              argument values on the stack, because it&rsquo;s when we&rsquo;re
+              executing a call that we know how to calculate the argument
+              values. But it&rsquo;s while we&rsquo;re looking at the definition
+              of the function that we know what variables are free, and so this
+              is the place where we want to move the free variables from the
+              heap to the stack.
+            </p>
+
+            <p>
+              Once we&rsquo;ve updated the symbol table to include the free
+              variables, we&rsquo;re ready to move them from the heap to the
+              stack (<code>fvs_to_stack</code>). Notice that we use
+              <code>(stack_address (-8 * (List.length defn.args + 1 + i))</code>
+              to put them past the normal function arguments on the stack. And
+              notice that we find the pointer to the function value by using
+              that special last argument we added in our call cases (<code
+                >Mov (Reg Rax, stack_address (-8 * (List.length defn.args +
+                1)))</code
+              >).
+            </p>
+
+            <p>
+              And that&rsquo;s it! When we encounter a lambda, it closes over
+              its environment to save all the context we need. We have full,
+              general lambdas.
+            </p>
+
+            <p>
+              And with that, we&rsquo;ve successfully completed a fully
+              operational functional programming language!
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="postamble" class="status">
+      <footer>
+        Content by Doug Woos, with modifications by Sarah E. Chasins<br />Style
+        adapted from
+        <a href="http://taopeng.me/org-notes-style/">org-notes-style</a>
+      </footer>
+    </div>
+  </body>
+</html>

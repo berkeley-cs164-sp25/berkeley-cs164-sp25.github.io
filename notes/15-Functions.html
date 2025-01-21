@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Functions</title>
+    <meta name="generator" content="Org mode" />
+    <meta name="author" content="Sarah E. Chasins" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link
+      href="https://www.dougwoos.com/assets/lecture-notes.css"
+      rel="stylesheet"
+      type="text/css"
+    />
+    <script type="text/javascript">
+      // @license magnet:?xt=urn:btih:e95b018ef3580986a04669f1b5879592219e2a7a&dn=public-domain.txt Public Domain
+      <!--/*--><![CDATA[/*><!--*/
+      function CodeHighlightOn(elem, id) {
+        var target = document.getElementById(id);
+        if (null != target) {
+          elem.classList.add("code-highlighted");
+          target.classList.add("code-highlighted");
+        }
+      }
+      function CodeHighlightOff(elem, id) {
+        var target = document.getElementById(id);
+        if (null != target) {
+          elem.classList.remove("code-highlighted");
+          target.classList.remove("code-highlighted");
+        }
+      }
+      /*]]>*/ //-->
+      // @license-end
+    </script>
+  </head>
+  <body>
+    <div id="content">
+      <header>
+        <h1 class="title">Functions</h1>
+      </header>
+      <nav id="table-of-contents">
+        <h2>Table of Contents</h2>
+        <div id="text-table-of-contents">
+          <ul>
+            <li><a href="#org28a34d4">Functions in the Interpreter:</a></li>
+            <li><a href="#orgecc46b9">Functions in the Compiler:</a></li>
+          </ul>
+        </div>
+      </nav>
+      <p>
+        Today we&rsquo;re adding functions to our language! A very exciting day
+        for us!
+      </p>
+
+      <p>Here are some programs we&rsquo;ll be able to support after today:</p>
+
+      <div class="org-src-container">
+        <pre class="src src-lisp">
+(define (id x) x)
+(print (id 4))
+</pre
+        >
+      </div>
+
+      <div class="org-src-container">
+        <pre class="src src-lisp">
+(define (f x y) (+ x y))
+(define (g x) (f x x))
+(print (f 4 5))
+</pre
+        >
+      </div>
+
+      <div class="org-src-container">
+        <pre class="src src-lisp">
+(define (fib n) (if (&lt; n 2) n (+ (fib (- n 1)) (fib (- n 2)))))
+(print (fib (read-num)))
+</pre
+        >
+      </div>
+
+      <div class="org-src-container">
+        <pre class="src src-lisp">
+(define (even n) (if (zero? n) true (odd (sub1 n))))
+(define (odd n) (if (zero? n) false (even (sub1 n))))
+(print (even (read-num)))
+</pre
+        >
+      </div>
+
+      <p>
+        You may notice some patterns that will constrain our implementation and
+        others that will make it easier. Here are a few interesting patterns:
+      </p>
+      <ul class="org-ul">
+        <li>We can have multiple expressions now.</li>
+        <li>Functions can be recursive (and mutually recursive).</li>
+        <li>
+          Function definitions are always at the top level&#x2014;we don&rsquo;t
+          have function definitions nested inside other function definitions or
+          inside let expressions.
+        </li>
+        <li>Function definitions appear before the body of the program.</li>
+        <li>We&rsquo;re not using functions as values.</li>
+      </ul>
+
+      <p>
+        You might also notice there&rsquo;s a regular structure to each of those
+        function definitions. They each seem to have a name, which is a string;
+        a list of arguments, which is a list of strings; and a body, which is
+        any s-expression.
+      </p>
+
+      <p>
+        To support us in implementing functions in both the interpreter and the
+        compiler, we&rsquo;re going to introduce a new type, <code>defn</code>.
+        We&rsquo;ll use this type to represent function definitions, and it will
+        include those same pieces of information we noticed in each of our
+        function definitions: name, arguments, and body.
+      </p>
+
+      <div class="org-src-container">
+        <label class="org-src-name"
+          ><span class="listing-number">Listing 1: </span
+          ><code>util.ml</code></label
+        >
+        <pre class="src src-ocaml">
+type defn = {name: string; args: string list; body: s_exp}
+</pre
+        >
+      </div>
+
+      <p>
+        We&rsquo;ll also have a helper function, <code>defns_and_body</code>,
+        which will just take care of retrieving definitions and the program body
+        out of the list of s-expressions we get from parsing our programs.
+      </p>
+
+      <div id="outline-container-org28a34d4" class="outline-2">
+        <h2 id="org28a34d4">Functions in the Interpreter:</h2>
+        <div class="outline-text-2" id="text-org28a34d4">
+          <p>
+            To kick things off, we&rsquo;ll have to start by changing our
+            <code>interp</code> function. Previously it called
+            <code>parse</code> to parse a single s-expression in each input
+            program. Now we&rsquo;ll use <code>parse_many</code> to retrieve a
+            list of s-expressions instead. Once we&rsquo;ve used our
+            <code>defns_and_body</code> helper to grab out the definitions and
+            body, we&rsquo;re ready to modify our call to
+            <code>interp_exp</code>. We&rsquo;ll probably want
+            <code>body</code> to be the thing we&rsquo;re interpreting, but how
+            should we communicate the definitions? We&rsquo;ll go ahead and add
+            those as an additional argument to <code>interp_exp</code>.
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 2: </span
+              ><code>interp.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let rec interp_exp (defns : defn list) (env : value symtab) (exp : s_exp) :
+    value =
+  (* ... *)
+
+let interp (program : string) : unit =
+  let defns, body = parse_many program |&gt; get_defns_and_body in
+  interp_exp defns Symtab.empty body |&gt; ignore
+</pre
+            >
+          </div>
+
+          <p>
+            Now that we&rsquo;ve changed the type signature of
+            <code>interp_exp</code>, we&rsquo;ll have to do a bit of bookkeeping
+            to make sure all our old calls to <code>interp_exp</code> pass those
+            <code>defns</code> around too. Since the program always has the same
+            set of definitions available (remember, all definitions appear at
+            the top level for now), we won&rsquo;t need to update them anywhere.
+            We&rsquo;ll just pass them around.
+          </p>
+
+          <p>
+            Ok, now that we have our function <i>definitions</i> available, what
+            do we do once we spot a function <i>call</i>? We have an interesting
+            decision to make about where we want to put our function call case
+            relative to other cases in <code>compile_exp</code>&rsquo;s
+            top-level match. Say the programmer defines a function named
+            <code>+</code>, and say we put our function call case before our
+            addition case. That means the programmer will be able to change what
+            <code>+</code> does in our language. We&rsquo;ll go ahead and put
+            the function call case right at the top of our match.
+          </p>
+
+          <p>
+            Here we also want to think about how to make the arguments available
+            when we&rsquo;re evaluating the function. Fortunately we already
+            know one way to make values available by names! We&rsquo;ve been
+            using our environment <code>symtab</code> to keep track of let-bound
+            items for a while now. We&rsquo;ll use that same mechanism to make
+            function arguments available while we&rsquo;re evaluating the body
+            of a function.
+          </p>
+
+          <p>
+            Here&rsquo;s what we&rsquo;ll add to our
+            <code>interp_exp</code> function:
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 3: </span
+              ><code>interp.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let rec interp_exp (defns : defn list) (env : value symtab) (exp : s_exp) :
+    value =
+  (* ... *)
+  | Lst (Sym f :: args) when is_defn defns f -&gt;
+      let defn = get_defn defns f in
+      if List.length args = List.length defn.args then
+	let vals = List.map (interp_exp defns env) args in
+	let fenv = (List.combine defn.args vals) |&gt; Symtab.of_list in
+	interp_exp defns fenv defn.body
+      else raise (BadExpression exp)
+</pre
+            >
+          </div>
+
+          <p>
+            Notice what we do to make sure this is really a valid function call.
+            We use <code>when is_defn defns</code> to make sure that the symbol
+            <code>f</code> is actually the name of one of the functions the
+            programmer defined. Then we make sure that the number of arguments
+            that appear in the function call matches the number of arguments the
+            function definition accepts. If both of those conditions are met,
+            we&rsquo;re good to go.
+          </p>
+
+          <p>
+            We also want to notice what&rsquo;s going on with the environments
+            we&rsquo;re passing into our <code>interp_exp</code> calls. When
+            we&rsquo;re evaluating the expressions in the argument list, we use
+            <code>env</code>, the environment we received. When we&rsquo;re
+            evaluating the body of the function, we discard
+            <i>everything</i> from <code>env</code>. Instead we make a new
+            environment that contains only the argument names, mapped to outputs
+            from evaluating the argument expressions.
+          </p>
+
+          <p>
+            The choice we made about the environment determines how scoping
+            works in our language. If we&rsquo;d decided to make a new symtab
+            that included <i>both</i> the original <code>env</code> names and
+            the function arguments, we&rsquo;d have produced
+            <i>dynamic scope</i>. This was once a fairly popular approach to
+            scoping, but it turns out to be very difficult for programmers to
+            reason about. These days, it&rsquo;s rare to see languages
+            implementing dynamic scope. Instead we chose to provide an
+            environment that included only the function&rsquo;s arguments. This
+            means our language has <i>lexical scope</i>. With lexical scope, we
+            can refer to names only within certain textual regions of the
+            program. For example, say we define a function <code>f</code>:
+            <code>(define (f x y) (+ (g x) (g y)))</code>. With lexical scope,
+            we can refer to <code>x</code> and <code>y</code> in the body of
+            <code>f</code>, but we can&rsquo;t refer to them once we&rsquo;re in
+            the body of <code>g</code>, even though <code>g</code> is called by
+            <code>f</code>.
+          </p>
+        </div>
+      </div>
+
+      <div id="outline-container-orgecc46b9" class="outline-2">
+        <h2 id="orgecc46b9">Functions in the Compiler:</h2>
+        <div class="outline-text-2" id="text-orgecc46b9">
+          <p>
+            Now that we&rsquo;ve seen how it works in the interpreter,
+            let&rsquo;s try to do the same thing with the compiler.
+          </p>
+
+          <p>
+            Unfortunately, one part of our interpreter approach really
+            won&rsquo;t work here. In the interpreter, whenever we encountered a
+            function call, we grabbed the body of the function and evaluated it.
+            Say we tried to do the same thing here. Every time we encounter a
+            function call, we could try to emit the assembly directives for
+            executing the function body. What would happen if we tried to do
+            this for the third and fourth example programs above?
+          </p>
+
+          <p>
+            Since we can&rsquo;t take that naive approach, we&rsquo;ll have to
+            find a way to put the function bodies into the assembly code once,
+            then jump to them whenever we need to execute the function.
+            Forunately we&rsquo;ve already had some good practice with calling
+            functions&#x2014;we&rsquo;ve already been calling the C functions we
+            defined in our runtime. We&rsquo;ll be able to do a similar process
+            for functions defined in our own input programs.
+          </p>
+
+          <p>
+            We&rsquo;ll start with doing some of the same bookkeeping we did in
+            the interpreter&#x2014;calling <code>parse_many</code>, changing
+            <code>compile</code> to accept a list of s-expressions instead of
+            just one, using <code>defns_and_body</code> to get the definitions
+            and body.
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 4: </span
+              ><code>compile.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let compile (program : s_exp list) : string =
+  let defns, body = defns_and_body program in
+  [ Global "entry"
+  ; Extern "error"
+  ; Extern "read_num"
+  ; Extern "print_value"
+  ; Extern "print_newline" ]
+  @ [Label "entry"]
+  @ compile_exp defns Symtab.empty (-8) body
+  @ [Ret]
+  @ List.concat_map (compile_defn defns) defns
+  |&gt; List.map string_of_directive
+  |&gt; String.concat "\n"
+
+let compile_to_file (program : string) : unit =
+  let file = open_out "program.s" in
+  output_string file (compile (parse_many program)) ;
+  close_out file
+</pre
+            >
+          </div>
+
+          <p>
+            You can see we also made some other changes here. First, we passed
+            the definitions as input to <code>compile_exp</code>. As in the
+            interpreter, we&rsquo;ll thread those definitions through all our
+            calls to <code>compile_exp</code>, without changing what&rsquo;s in
+            the <code>defns</code> list. But we&rsquo;ve also done something a
+            bit weird. We&rsquo;ve added additional directives after our
+            <code>Ret</code>. What are we putting after <code>Ret</code>?
+            We&rsquo;re calling a new helper function
+            <code>compile_defn</code> on each of our function definitions, and
+            adding the resulting directives to the end of our assembly code.
+            Let&rsquo;s take a look at what <code>compile_defn</code> is doing
+            to make the function definitions available in our assembly programs.
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 5: </span
+              ><code>compile.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let compile_defn defns {name; args; body} =
+  let ftab =
+    args
+    |&gt; List.mapi (fun i arg -&gt; (arg, -8 * (i + 1)))
+    |&gt; Symtab.of_list
+  in
+  [Label (defn_label name)]
+  @ compile_exp defns ftab (-8 * (List.length args + 1)) body
+  @ [Ret]
+
+</pre
+            >
+          </div>
+
+          <p>
+            Our overall goal here is to put each function body at its own label.
+          </p>
+
+          <p>
+            When we were calling C functions, C was in charge of producing the
+            labels for the functions and putting the appropriate assembly
+            instructions after. For programmer-defined functions, we&rsquo;re in
+            charge of doing the same process. When we&rsquo;re compiling the
+            <i>definition</i>, we don&rsquo;t know what values will be passed as
+            arguments. In fact, if we call the function multiple times in the
+            program, we may be passing in many different arguments. Since we
+            can&rsquo;t make the argument values available while we&rsquo;re
+            compiling the <i>definition</i>, we&rsquo;ll have to take care of
+            making the arguments available when we&rsquo;re compiling the
+            <i>call</i>. However, since we&rsquo;re compiling the body right
+            now, we still need to know where the body should look to find those
+            values. We&rsquo;ll go ahead and decide where the arguments will
+            live, even though the call will be in charge of putting the
+            appropriate values into those slots.
+          </p>
+
+          <p>
+            Here we&rsquo;ve decided to put the first argument at the stack
+            pointer minus 8, the second argument at the stack pointer minus 16,
+            and so on. Remember that the compiler&rsquo;s symtab maps from a
+            name to the offset from <code>rsp</code> where it can find the value
+            bound to that name. So if a function has n arguments,
+            <code>ftab</code> maps the arguments to the first n slots above the
+            stack pointer. Once we&rsquo;re ready to compile the function calls,
+            that&rsquo;s where we&rsquo;ll want to put the argument values.
+          </p>
+
+          <p>
+            In the meantime, we now have enough information to finish compiling
+            the definitions. Since we know how much space will be taken by the n
+            arguments, we can pass an apprioriate stack index to our
+            <code>compile_exp</code> call that compiles the body. We&rsquo;ll
+            tell the body not to use any of the slots that are already populated
+            with arguments, but anything above that is fair game. And as in our
+            compiler, we&rsquo;ve designed <code>ftab</code> so that only the
+            function arguments are available within the function body.
+          </p>
+
+          <p>
+            Finally, we emit the list of directives. We add a label based on the
+            function name. The <code>defn_label</code> function takes care of
+            generating an appropriate label&#x2014;this is important because
+            some strings are allowable function names in our language but not
+            allowable labels in the assembly. After the label, we emit the
+            directives for the body itself, and lastly the <code>Ret</code>.
+          </p>
+
+          <p>
+            Now let&rsquo;s move to <code>compile_exp</code> itself and
+            compiling function <i>calls</i>.
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 6: </span
+              ><code>compile.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let rec compile_exp (defns : defn list) (tab : int symtab) (stack_index : int)
+    (exp : s_exp) : directive list =
+  (* ... *)
+  | Lst (Sym f :: args) when is_defn defns f -&gt;
+      let defn = get_defn defns f in
+      if List.length args = List.length defn.args then
+	let stack_base = align_stack_index (stack_index + 8) in
+	let compiled_args =
+	  args
+	  |&gt; List.mapi (fun i arg -&gt;
+		 compile_exp defns tab (stack_base - ((i + 2) * 8)) arg
+		 @ [Mov (stack_address (stack_base - ((i + 2) * 8)), Reg Rax)])
+	  |&gt; List.concat
+	in
+	compiled_args
+	@ [ Add (Reg Rsp, Imm stack_base)
+	  ; Call (defn_label f)
+	  ; Sub (Reg Rsp, Imm stack_base) ]
+      else raise (BadExpression exp)
+</pre
+            >
+          </div>
+
+          <p>
+            In some ways, this looks a lot like our C calls. We&rsquo;re still
+            doing the <code>Add</code> to point <code>rsp</code> to the last
+            used slot (or 8 bytes beyond that, if we need the buffer to keep
+            everything 16-byte aligned). We&rsquo;re still doing the
+            <code>Call</code> to pass execution to the funtion we&rsquo;re
+            calling. And we&rsquo;re still doing the <code>Sub</code> to point
+            <code>rsp</code> back to where it pointed before the call.
+          </p>
+
+          <p>
+            One imporant thing we&rsquo;re <i>not</i> doing: saving
+            <code>rdi</code>. Since we control the assembly in the function that
+            we&rsquo;re calling, we know none of the code we generate will
+            clobber <code>rdi</code>. In fact, if it does update
+            <code>rdi</code> because it puts something on the heap, that&rsquo;s
+            something we need to know about! So we don&rsquo;t need to save and
+            restore <code>rdi</code>.
+          </p>
+
+          <p>
+            The other big change compared to our C calls: we have to put those
+            arguments onto the stack, right where the function definition is
+            expecting to find them. Remember, <code>Call</code> increments the
+            stack pointer by -8. <code>stack_base + 1*-8</code> thus points to
+            the slot where our return address will end up. And
+            <code>stack_base + 2*-8</code> points to the slot where we want our
+            first argument to live. So we know what offset to use for our
+            <code>Mov</code> instruction, for each argument. But what stack
+            index should we pass as input when we call <code>compile_exp</code>?
+            We can actually use the exact same offset we use for the
+            <code>Mov</code>. When we&rsquo;re populating the arguments in the
+            stack, we slot them in from the bottom up. If the next available
+            slot is at offset <code>x</code>, then we can use any slot at offset
+            <code>x</code> or above to calculate the value we&rsquo;ll
+            eventually place in <code>x</code>.
+          </p>
+
+          <p>
+            And with that, we have functions! Open up <code>dune utop</code> and
+            try it out!
+          </p>
+        </div>
+      </div>
+    </div>
+    <div id="postamble" class="status">
+      <footer>
+        Content by Doug Woos, with modifications by Sarah E. Chasins<br />Style
+        adapted from
+        <a href="http://taopeng.me/org-notes-style/">org-notes-style</a>
+      </footer>
+    </div>
+  </body>
+</html>

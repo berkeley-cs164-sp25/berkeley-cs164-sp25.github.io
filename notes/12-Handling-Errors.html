@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Handling errors</title>
+    <meta name="generator" content="Org mode" />
+    <meta name="author" content="Sarah E. Chasins" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link
+      href="https://www.dougwoos.com/assets/lecture-notes.css"
+      rel="stylesheet"
+      type="text/css"
+    />
+    <script type="text/javascript">
+      // @license magnet:?xt=urn:btih:e95b018ef3580986a04669f1b5879592219e2a7a&dn=public-domain.txt Public Domain
+      <!--/*--><![CDATA[/*><!--*/
+      function CodeHighlightOn(elem, id) {
+        var target = document.getElementById(id);
+        if (null != target) {
+          elem.classList.add("code-highlighted");
+          target.classList.add("code-highlighted");
+        }
+      }
+      function CodeHighlightOff(elem, id) {
+        var target = document.getElementById(id);
+        if (null != target) {
+          elem.classList.remove("code-highlighted");
+          target.classList.remove("code-highlighted");
+        }
+      }
+      /*]]>*/ //-->
+      // @license-end
+    </script>
+  </head>
+  <body>
+    <div id="content">
+      <header>
+        <h1 class="title">Handling errors</h1>
+      </header>
+      <nav id="table-of-contents">
+        <h2>Table of Contents</h2>
+        <div id="text-table-of-contents">
+          <ul>
+            <li><a href="#org811c0c8">Modifying the runtime</a></li>
+            <li><a href="#orgda6be96">Modifying the compiler</a></li>
+            <li><a href="#orgaea82e8">Compiler correctness revisited</a></li>
+          </ul>
+        </div>
+      </nav>
+      <p>
+        Right now, here&rsquo;s how we&rsquo;re defining correctness for our
+        compiler:
+      </p>
+
+      <p>
+        For all programs <code>p</code>, if the interpreter produces a value
+        when run on <code>p</code>, the compiler produces machine code that
+        produces that same value.
+      </p>
+
+      <p>
+        But the interpreter doesn&rsquo;t produce a value for every program! On
+        <code>(add1 false)</code>, for instance, the interpreter throws an
+        exception.
+      </p>
+
+      <p>
+        For these programs, we&rsquo;re currently making no claims about our
+        compiler&rsquo;s behavior. Maybe it will return an error of some
+        kind&#x2013;for instance, on <code>(add1 false)</code> we get an error
+        from the runtime because it doesn&rsquo;t know how to print the value.
+        On totally invalid programs like <code>(hello hello)</code> our compiler
+        will raise the same error as our interpreter&#x2013;we don&rsquo;t know
+        how to compile programs like that.
+      </p>
+
+      <p>
+        But on some of these programs, our compiler will actually produce a
+        value (or really, produce a machine-code program that produces a value).
+        <code>(add1 (sub1 false))</code>, for instance, produces
+        <code>false</code> in the compiler even though the interpreter
+        doesn&rsquo;t recognize it as a valid program.
+      </p>
+
+      <p>
+        Today, we&rsquo;ll fix this issue, modifying our compiler to handle
+        these errors.
+      </p>
+
+      <div id="outline-container-org811c0c8" class="outline-2">
+        <h2 id="org811c0c8">Modifying the runtime</h2>
+        <div class="outline-text-2" id="text-org811c0c8">
+          <p>
+            First, we&rsquo;ll add an error-handling function to the runtime.
+            We&rsquo;ll call this function from our compiled programs when an
+            error occurs.
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 1: </span
+              ><code>runtime.c</code></label
+            >
+            <pre class="src src-c">
+void error() {
+  printf("ERROR");
+  exit(1);
+}
+</pre
+            >
+          </div>
+
+          <p>As usual, we&rsquo;ll need to recompile the runtime:</p>
+
+          <div class="org-src-container">
+            <pre class="src src-sh">
+gcc -c runtime.c -o runtime.o
+</pre
+            >
+          </div>
+        </div>
+      </div>
+
+      <div id="outline-container-orgda6be96" class="outline-2">
+        <h2 id="orgda6be96">Modifying the compiler</h2>
+        <div class="outline-text-2" id="text-orgda6be96">
+          <p>
+            First, we&rsquo;ll need to modify our compiler&rsquo;s output so
+            that we can call our new
+            <code>error</code> function:
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 2: </span
+              ><code>compile.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let compile (program : s_exp) : string =
+  [Global "entry"; Extern "error"; Label "entry"]
+  @ compile_exp Symtab.empty (-8) program
+  @ [Ret]
+  |&gt; List.map string_of_directive
+  |&gt; String.concat "\n"
+</pre
+            >
+          </div>
+
+          <p>
+            That <code>Extern "error"</code> directive is sort of the inverse of
+            <code>Global</code>: it tells the assembler that our program will be
+            linked against a program that includes a definition for the
+            <code>error</code> label.
+          </p>
+
+          <p>
+            We&rsquo;ll jump to this label whenever we want to signal an error
+            at runtime. For instance, <code>add1</code> should raise an error if
+            its argument isn&rsquo;t a number:
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 3: </span
+              ><code>compile.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let rec compile_exp (tab : int symtab) (stack_index : int) (exp : s_exp) :
+    directive list =
+  match exp with
+  (* some cases elided ... *)
+  | Lst [Sym "add1"; arg] -&gt;
+      compile_exp tab stack_index arg
+      @ [ Mov (Reg R8, op)
+	; And (Reg R8, Imm num_mask)
+	; Cmp (Reg R8, Imm num_tag)
+	; Jnz "error" ]
+      @ [Add (Reg Rax, operand_of_num 1)]
+</pre
+            >
+          </div>
+
+          <p>
+            We raise an error by jumping to our <code>error</code> function. In
+            general calling C functions will be more complex than this since we
+            want to preserve our heap pointer and values on our stack, but since
+            the <code>error</code> function stops execution we don&rsquo;t need
+            to worry about any of that.
+          </p>
+
+          <p>We can extract these directives into a helper function:</p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 4: </span
+              ><code>compile.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let ensure_num (op : operand) : directive list =
+  [ Mov (Reg R8, op)
+  ; And (Reg R8, Imm num_mask)
+  ; Cmp (Reg R8, Imm num_tag)
+  ; Jnz "error" ]
+</pre
+            >
+          </div>
+
+          <p>
+            (We should only call <code>ensure_num</code> when we&rsquo;re not
+            using the value in <code>r8</code>!)
+          </p>
+
+          <p>
+            We can use this to add error handling to functions that should take
+            numbers:
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 5: </span
+              ><code>compile.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let rec compile_exp (tab : int symtab) (stack_index : int) (exp : s_exp) :
+    directive list =
+  match exp with
+  (* some cases elided ... *)
+  | Lst [Sym "add1"; arg] -&gt;
+      compile_exp tab stack_index arg
+      @ ensure_num (Reg Rax)
+      @ [Add (Reg Rax, operand_of_num 1)]
+  | Lst [Sym "+"; e1; e2] -&gt;
+      compile_exp tab stack_index e1
+      @ ensure_num (Reg Rax)
+      @ [Mov (stack_address stack_index, Reg Rax)]
+      @ compile_exp tab (stack_index - 8) e2
+      @ (ensure_num (Reg Rax)
+      @ [Mov (Reg R8, stack_address stack_index)]
+      @ [Add (Reg Rax, Reg R8)]
+</pre
+            >
+          </div>
+
+          <p>and so on. We can write a similar function for pairs:</p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 6: </span
+              ><code>compile.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let ensure_pair (op : operand) : directive list =
+  [ Mov (Reg R8, op)
+  ; And (Reg R8, Imm heap_mask)
+  ; Cmp (Reg R8, Imm pair_tag)
+  ; Jnz "error" ]
+</pre
+            >
+          </div>
+        </div>
+      </div>
+
+      <div id="outline-container-orgaea82e8" class="outline-2">
+        <h2 id="orgaea82e8">Compiler correctness revisited</h2>
+        <div class="outline-text-2" id="text-orgaea82e8">
+          <p>
+            We can now make a stronger statement about compiler correctness:
+          </p>
+
+          <p>
+            For all programs <code>p</code>, if the interpreter produces a value
+            when run on <code>p</code>, the compiler produces machine code that
+            produces that same value. If the interpreter produces an error, the
+            compiler will either produce an error or produce a program that
+            produces an error.
+          </p>
+
+          <p>We can add support for erroring programs to our tester:</p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 7: </span
+              ><code>interp.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let interp_err (program : string) : string =
+  try interp program with BadExpression _ -&gt; "ERROR"
+</pre
+            >
+          </div>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 8: </span
+              ><code>compile.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let compile_and_run_err (program : string) : string =
+  try compile_and_run program with BadExpression _ -&gt; "ERROR"
+
+let difftest (examples : string list) =
+  let results =
+    List.map (fun ex -&gt; (compile_and_run_err ex, Interp.interp_err ex)) examples
+  in
+  List.for_all (fun (r1, r2) -&gt; r1 = r2) results
+</pre
+            >
+          </div>
+
+          <p>
+            We have one lingering problem: there are some programs that produce
+            an error in our compiler but <b>not</b> in our interpreter. An
+            example is <code>(if true 1 (hello hello))</code>. Since the
+            interpreter never evaluates <code>(hello hello)</code>, it happily
+            produces the value <code>1</code>. The compiler, however, will throw
+            an error at compile-time. We could fix this by adding a check to the
+            interpreter to ensure that the programs it&rsquo;s trying to
+            interpret are <i>well-formed</i> (i.e., don&rsquo;t contain
+            expressions like <code>(hello hello)</code>) even if they
+            aren&rsquo;t type-correct.
+          </p>
+        </div>
+      </div>
+    </div>
+    <div id="postamble" class="status">
+      <footer>
+        Content by Doug Woos, with modifications by Sarah E. Chasins<br />Style
+        adapted from
+        <a href="http://taopeng.me/org-notes-style/">org-notes-style</a>
+      </footer>
+    </div>
+  </body>
+</html>

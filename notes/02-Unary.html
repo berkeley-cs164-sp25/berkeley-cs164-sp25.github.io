@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Unary operations</title>
+<meta name="generator" content="Org mode">
+<meta name="author" content="Sarah E. Chasins">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="lecture-notes.css" rel="stylesheet" type="text/css" />
+<script type="text/javascript">
+// @license magnet:?xt=urn:btih:e95b018ef3580986a04669f1b5879592219e2a7a&dn=public-domain.txt Public Domain
+<!--/*--><![CDATA[/*><!--*/
+     function CodeHighlightOn(elem, id)
+     {
+       var target = document.getElementById(id);
+       if(null != target) {
+         elem.classList.add("code-highlighted");
+         target.classList.add("code-highlighted");
+       }
+     }
+     function CodeHighlightOff(elem, id)
+     {
+       var target = document.getElementById(id);
+       if(null != target) {
+         elem.classList.remove("code-highlighted");
+         target.classList.remove("code-highlighted");
+       }
+     }
+    /*]]>*///-->
+// @license-end
+</script>
+</head>
+<body>
+<div id="preamble" class="status">
+<div class='alert'><span class='bold'>Important:</span> These notes are not designed to subsitute for class sessions.  Importantly, they do <span class='ital'>not</span> cover all content required for the exams or for implementing HWs.  These are just an aid for re-implementing the class compiler, after you've already come to class and completed the in-class activities!</div>
+</div>
+<div id="content">
+<header>
+<h1 class="title">Unary operations</h1>
+</header><nav id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#orged011f9">Adding operations</a></li>
+</ul>
+</div>
+</nav>
+<p>
+Today we&rsquo;ll work on extending the language supported by our compiler with a
+couple of <i>unary</i> operations. In particular:
+</p>
+
+<ul class="org-ul">
+<li><code>(add1 x)</code> adds one to <code>x</code></li>
+<li><code>(sub1 x)</code> subtracts one from <code>x</code></li>
+</ul>
+
+<p>
+We&rsquo;ll also learn a bit more about the semantics
+of x86-64 assembly.
+</p>
+
+<div id="outline-container-orged011f9" class="outline-2">
+<h2 id="orged011f9">Adding operations</h2>
+<div class="outline-text-2" id="text-orged011f9">
+<p>
+Here&rsquo;s the compiler we ended up with after last class:
+</p>
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 1: </span>compile.ml</label><pre class="src src-ocaml">let compile (program : s_exp) : string =
+  match program with
+  | Num n -&gt;
+      String.concat "\n"
+	[
+	  "global _entry"; "_entry:"; Printf.sprintf "\tmov rax, %d" n; "\tret";
+	]
+  | e -&gt; raise (BadExpression e)
+
+</pre>
+</div>
+
+<p>
+First, let&rsquo;s go over exactly what it is that the code this compiler produces
+does right now. See lecture capture for details.
+</p>
+
+<p>
+Before we extend the compiler to support new operations, we&rsquo;re going to make a
+couple of changes. First: right now, the compiler will only work on
+MacOS, not Linux; on Linux, labels shouldn&rsquo;t have underscores, whereas on MacOS
+they must. Relatedly: right now, it&rsquo;s sort of hard to read! The <code>mov</code> and <code>ret</code>
+instructions both have tab characters, there&rsquo;s that <code>sprintf</code> call, and so on.
+</p>
+
+<p>
+Just as we introduced a more usable representation for s-expressions, we&rsquo;ll use
+an OCaml type for assembly language as well. See the lecture capture for the
+details of how our <code>Asm</code> library works.
+</p>
+
+<p>
+Using the <code>Asm</code> library, we can rewrite our compiler:
+</p>
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 2: </span>compile.ml</label><pre class="src src-ocaml">open Asm
+
+(* some definitions elided... *)
+
+let compile (exp: s_exp) : string =
+  match exp with
+  | Num n -&gt;
+    [Global "entry"; Label "entry"; Mov (Reg Rax, Imm n); Ret] 
+    |&gt; List.map string_of_directive |&gt; String.concat "\n"
+  | _ -&gt; raise (BadExpression exp)
+</pre>
+</div>
+
+<p>
+This code uses the &ldquo;pipeline&rdquo; operator <code>|&gt;</code>. This operator gives us a cleaner
+way of calling functions in OCaml; <code>x |&gt; f</code> is exactly the same as <code>f x</code>. It
+lets us write expressions from &ldquo;inner&rdquo; to &ldquo;outer&rdquo; rather than the other way
+around; the pipeline expression in the code above could be replaced with
+</p>
+
+<div class="org-src-container">
+<pre class="src src-ocaml">String.concat "\n" (List.map string_of_directive [Global "entry"; Label "entry"; Mov (Reg Rax, Imm n); Ret])
+</pre>
+</div>
+
+<p>
+Notice the other thing we&rsquo;re doing here: <i>partial application</i>. We can provide
+<i>some</i> of the arguments to an OCaml function and get back a function we can
+apply to the rest of the arguments. For instance, since
+</p>
+
+<div class="org-src-container">
+<pre class="src src-ocaml">List.map : ('a -&gt; 'b) -&gt; 'a list -&gt; 'b list
+</pre>
+</div>
+
+<p>
+we know that
+</p>
+
+<div class="org-src-container">
+<pre class="src src-ocaml">List.map string_of_directive : directive list -&gt; string list
+</pre>
+</div>
+
+<p>
+OK: now we&rsquo;re ready to add support for <code>add1</code> and <code>sub1</code>. These are both <i>unary</i>
+operations: they take one argument. Each of them takes in an integer and returns
+an integer. (Integers are still the only type our language supports.) We&rsquo;re
+starting with unary operations because we&rsquo;ll be able to implement them using
+only a single register (namely our friend <code>rax</code>).
+</p>
+
+<p>
+Let&rsquo;s start with the <code>add1</code> operation. What code should our compiler produce
+for, say, <code>(add1 50)</code>?. How about something like this:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-asm">global entry
+entry:
+	mov rax, 50
+	add rax, 1
+	ret
+</pre>
+</div>
+
+<p>
+So, let&rsquo;s write some code. We know we&rsquo;re going to need to match against these new operations.
+</p>
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 3: </span>compile.ml</label><pre class="src src-ocaml">let compile (exp: s_exp) : string =
+  match exp with
+  | Num n -&gt;
+    [Global "entry"; Label "entry"; Mov (Reg Rax, Imm n); Ret] 
+    |&gt; List.map string_of_directive |&gt; String.concat "\n"
+  | Lst [Sym "add1"; arg] -&gt;
+    (* what should we put here? *) 
+  | _ -&gt; raise (BadExpression exp)
+</pre>
+</div>
+
+<p>
+Once we&rsquo;ve done that, we get a bit stuck. We&rsquo;re going to need to include the
+&ldquo;global entry&rdquo;, &ldquo;entry:&rdquo;, and &ldquo;ret&rdquo; directives again, which seems
+repetitive. We&rsquo;re also going to need to do something with the argument to our
+operation.
+</p>
+
+<p>
+Let&rsquo;s reorganize our compiler one more time:
+</p>
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 4: </span>compile.ml</label><pre class="src src-ocaml">let compile_exp (exp: s_exp) : directive list =
+  match exp with
+  | Num n -&gt;
+    [Mov (Reg Rax, Imm n)]
+  | Lst [Sym "add1"; arg] -&gt;
+    (* what should we put here? *) 
+  | _ -&gt; raise (BadExpression exp)
+
+let compile (program : s_exp) : string =
+  [Global "entry"; Label "entry"] @
+  compile_exp program @
+  [Ret] |&gt; List.map string_of_directive |&gt; String.concat "\n"
+</pre>
+</div>
+
+<p>
+We now have a helper function <code>compile_exp</code> in which we don&rsquo;t need to worry
+about &ldquo;boilerplate&rdquo; like our label and our return instruction. Now, we can
+complete our support for <code>add1</code>:
+</p>
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 5: </span>compile.ml</label><pre class="src src-ocaml">let rec compile_exp (exp: s_exp) : directive list =
+  match exp with
+  | Num n -&gt;
+    [Mov (Reg Rax, Imm n)]
+  | Lst [Sym "add1"; arg] -&gt;
+    compile_exp arg @
+    [Add (Reg Rax, Imm 1)]
+  | _ -&gt; raise (BadExpression exp)
+</pre>
+</div>
+
+<p>
+In the <code>add1</code> case, we first <i>recursively</i> compile the argument to the
+operation. We don&rsquo;t know what it is&#x2013;it could be a number, or another unary
+operation. Regardless, we know what our compiler is going to do: it&rsquo;s going to
+produce a sequence of instructions that will put the value of that expression
+<i>in <code>rax</code></i>.
+</p>
+
+<p>
+We can add <code>sub1</code> support similarly:
+</p>
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 6: </span>compile.ml</label><pre class="src src-ocaml">let rec compile_exp (exp: s_exp) : directive list =
+  match exp with
+  | Num n -&gt;
+    [Mov (Reg Rax, Imm n)]
+  | Lst [Sym "add1"; arg] -&gt;
+    compile_exp arg @
+    [Add (Reg Rax, Imm 1)]
+  | Lst [Sym "sub1"; arg] -&gt;
+    compile_exp arg @
+    [Sub (Reg Rax, Imm 1)]
+  | _ -&gt; raise (BadExpression exp)
+</pre>
+</div>
+
+<p>
+OK&#x2013;this looks reasonable! But how do we know it&rsquo;s right?
+</p>
+
+<p>
+Think about this for the next couple days, and we&rsquo;ll talk about it next session!
+</p>
+</div>
+</div>
+</div>
+<div id="postamble" class="status">
+<footer>Content by Doug Woos, with modifications by Sarah E. Chasins<br/>Style adapted from <a href="http://taopeng.me/org-notes-style/">org-notes-style</a></footer>
+</div>
+</body>
+</html>

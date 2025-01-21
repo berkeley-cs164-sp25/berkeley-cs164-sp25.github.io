@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What is a compiler?</title>
+<meta name="generator" content="Org mode">
+<meta name="author" content="Sarah E. Chasins">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="lecture-notes.css" rel="stylesheet" type="text/css" />
+<script type="text/javascript">
+// @license magnet:?xt=urn:btih:e95b018ef3580986a04669f1b5879592219e2a7a&dn=public-domain.txt Public Domain
+<!--/*--><![CDATA[/*><!--*/
+     function CodeHighlightOn(elem, id)
+     {
+       var target = document.getElementById(id);
+       if(null != target) {
+         elem.classList.add("code-highlighted");
+         target.classList.add("code-highlighted");
+       }
+     }
+     function CodeHighlightOff(elem, id)
+     {
+       var target = document.getElementById(id);
+       if(null != target) {
+         elem.classList.remove("code-highlighted");
+         target.classList.remove("code-highlighted");
+       }
+     }
+    /*]]>*///-->
+// @license-end
+</script>
+</head>
+<body>
+<div id="preamble" class="status">
+<div class='alert'><span class='bold'>Important:</span> These notes are not designed to subsitute for class sessions.  Importantly, they do <span class='ital'>not</span> cover all content required for the exams or for implementing HWs.  These are just an aid for re-implementing the class compiler, after you've already come to class and completed the in-class activities!</div>
+</div>
+<div id="content">
+<header>
+<h1 class="title">What is a compiler?</h1>
+</header><nav id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#orgb5b3db7">How is a compiler different from an interpreter?</a></li>
+<li><a href="#org8127770">This class</a>
+<ul>
+<li><a href="#orgcfa1005">Logistics</a></li>
+</ul>
+</li>
+<li><a href="#orgc3409b2">Our first compiler</a>
+<ul>
+<li><a href="#orga611027">Printing a number, the hard way</a></li>
+<li><a href="#orgfb44160">The compiler</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</nav>
+<p>
+A compiler is a program that takes in source code written in one language
+(called the <i>source language</i>) and returns source code written in another
+language (called the <i>target language</i>). Here&rsquo;s how we might write this in
+quasi-mathematical notation:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-ocaml">compiler : source_program -&gt; target_program
+</pre>
+</div>
+
+<p>
+That <code>:</code> is read &ldquo;has type&rdquo;. The arrow represents a function type; in this case,
+a function from programs written in the source language to programs written in
+the target language.
+</p>
+
+<p>
+What are <code>source_program</code> and <code>target_program</code>? They must be types representing
+code in each programming language. For many or most programming language, that
+type is ultimately <code>string</code>; programmers write programs as sequences of
+characters. So we could write something like
+</p>
+
+<div class="org-src-container">
+<pre class="src src-ocaml">compiler : string -&gt; string
+</pre>
+</div>
+
+<p>
+For this class, though, we&rsquo;ll use the previous definition. In some languages&#x2013;for
+instance, block-based programming languages like Scratch&#x2013;programmers usually
+<i>don&rsquo;t</i> write source code as strings. Also, the first definition is a bit more
+specific about what these strings should look like.
+</p>
+
+<p>
+So, now that we have our definition: what are some compilers you&rsquo;ve worked with?
+What are their types?
+</p>
+
+<table>
+
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left"><code>compiler</code></th>
+<th scope="col" class="org-left"><code>:</code></th>
+<th scope="col" class="org-left"><code>source_program</code></th>
+<th scope="col" class="org-left"><code>-&gt;</code></th>
+<th scope="col" class="org-left"><code>target_program</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left"><code>javac</code></td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">Java</td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">Java bytecode</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>gcc</code></td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">C</td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">Machine code</td>
+</tr>
+
+<tr>
+<td class="org-left">&#x2026;</td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">&#xa0;</td>
+</tr>
+</tbody>
+</table>
+
+<div id="outline-container-orgb5b3db7" class="outline-2">
+<h2 id="orgb5b3db7">How is a compiler different from an interpreter?</h2>
+<div class="outline-text-2" id="text-orgb5b3db7">
+<p>
+In addition to compilers, you might have used <i>interpreters</i>
+before. Interpreters are closely related to compilers; indeed, in this course
+you&rsquo;ll develop a number of interpreters as well as a number of compilers. What&rsquo;s
+the type of an interpreter?
+</p>
+
+<p>
+Like a compiler, an interpreter takes in program code. What does it produce?
+</p>
+
+<p>
+Here&rsquo;s one possible type:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-ocaml">interpreter : source_program -&gt; value
+</pre>
+</div>
+
+<p>
+Rather than producing more code in some target language, as a compiler does, an
+interpreter <i>interprets</i> its input code and produces some value.
+</p>
+
+<p>
+Something to think about here: does it make any sense to have a compiler if
+you don&rsquo;t have any interpreters?  How would you actually get a value out of any
+of those programs you&rsquo;re making?  This is why one very important
+interpreter for our purposes is the computer&rsquo;s CPU! Depending on your computer,
+this is probably an interpreter for x86-64 <i>machine code</i>. Machine code is the
+&ldquo;native&rdquo; language of the computer. It&rsquo;s often targeted by compilers, including
+the compilers we&rsquo;ll develop in this course.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org8127770" class="outline-2">
+<h2 id="org8127770">This class</h2>
+<div class="outline-text-2" id="text-org8127770">
+<p>
+In this class we will be developing, testing, and discussing compilers&#x2013;in fact,
+we&rsquo;ll write our first compiler in just a little while. Why does this class
+exist? Why should you take it?
+</p>
+
+<p>
+One reason is that compilers are interesting! One of the big
+appeals of computer science is that it blends elegant theory with practical
+utility, and I think this topic is a great example of that. On the theory side,
+we&rsquo;ll learn about formal notions of compiler correctness and algorithms for
+things like register allocation; on the practice side, we&rsquo;ll get our hands dirty
+writing real compilers for real systems.
+</p>
+
+<p>
+On a related note, compilers are complex software systems. Like an operating
+systems class, a compilers class is an opportunity to deploy good software
+engineering and testing practices on decently large programs. We&rsquo;ll talk a lot
+in this course about testing in particular!
+</p>
+
+<p>
+Also, developing compilers in this course can improve your interactions with
+compilers in your regular life. I can&rsquo;t promise that after taking this course
+you&rsquo;ll immediately understand every bizarre C++ error you get, but you&rsquo;ll at
+least have a better understanding of where those errors are coming from.  As
+long as you keep programming, you&rsquo;ll keep interacting with compilers and
+interpreters, so this should be a gift that keeps on giving!
+</p>
+
+<p>
+Finally, some of those same skills that will help you understand your
+programming tools will also help you pick up new languages.  Again, no
+guarantees here, but understanding more about how languages are implemented,
+how they vary, how to debug that wacky thing your compiler is doing&#x2013;these
+skills can all help you pick up new programming languages more quickly and
+easily.
+</p>
+</div>
+
+<div id="outline-container-orgcfa1005" class="outline-3">
+<h3 id="orgcfa1005">Logistics</h3>
+<div class="outline-text-3" id="text-orgcfa1005">
+<p>
+A few logistics points for now:
+</p>
+
+<ul class="org-ul">
+<li>The course website has most of the details you need about course structure!</li>
+
+<li>One (short!) assignments and another (even shorter!) assignment are due next week:
+<ul class="org-ul">
+<li>The first homework assignment, HW0. Homeworks will be due weekly or
+biweekly. HW0 is a very short
+programming assignment in the OCaml programming language. We&rsquo;re not
+expecting you to have written any OCaml before this course; the point of
+this homework is just to make sure everyone has the development environment set
+up and has started to learn the language. We&rsquo;ll talk more about OCaml very soon.</li>
+<li>The first drill. There will be drills due every week, except this first week. These are short quizzes, graded on completion; the idea is to
+get an idea of how comfortable everyone is feeling with the week&rsquo;s class
+material, so we can spend more time on the topics you need most. This first drill
+asks you to look over the course
+syllabus, including the course collaboration and professionalism policies.</li>
+</ul></li>
+<li>Most of your grade for the course will be based on the homeworks. You&rsquo;ll also
+get some points for completing the drills. The other component of your grade will
+be exams; you&rsquo;ll have two of these, one midterm and one
+final.</li>
+</ul>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgc3409b2" class="outline-2">
+<h2 id="orgc3409b2">Our first compiler</h2>
+<div class="outline-text-2" id="text-orgc3409b2">
+<p>
+OK: let&rsquo;s write a compiler! Eventually, we&rsquo;ll write a compiler for a programming
+language with the following features:
+</p>
+
+<ul class="org-ul">
+<li>Arithmetic</li>
+<li>Conditionals (ifs)</li>
+<li>Variables</li>
+<li>Lists</li>
+<li>First-class functions</li>
+<li>&#x2026;and more!</li>
+</ul>
+
+<p>
+We&rsquo;ll tackle these and other features one at a time, slowly growing the language
+our compiler supports. We&rsquo;ll talk more about what this language will look like
+next time. For now, let&rsquo;s try to write a compiler for a very small subset of
+this language: the integers!
+</p>
+
+<p>
+Here are some examples of programs written in this language:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-ocaml">42
+10
+-4
+4000000000000
+</pre>
+</div>
+
+<p>
+What should these programs do? Well, let&rsquo;s see what they do in Python:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-python">$ python
+&gt;&gt;&gt; 42
+42
+&gt;&gt;&gt; 10
+10
+</pre>
+</div>
+
+<p>
+It looks like these programs should sort of just return themselves.
+</p>
+
+<p>
+Our compiler is going to target x86-64 machine code. That way, we won&rsquo;t need any
+other programs in order to interpret the programs we produce. What should a
+program to print out a number look like?
+</p>
+</div>
+
+<div id="outline-container-orga611027" class="outline-3">
+<h3 id="orga611027">Printing a number, the hard way</h3>
+<div class="outline-text-3" id="text-orga611027">
+<p>
+We can find out by writing such a program in C:
+</p>
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 1: </span><code>program.c</code></label><pre class="src src-c">#include &lt;stdio.h&gt;
+#include &lt;inttypes.h&gt;
+
+int64_t entry() {
+  return 4000000000000;
+}
+
+
+int main(int argc, char **argv) {
+  printf("%" PRIi64, entry());
+  return 0;
+}
+</pre>
+</div>
+
+<p>
+This program is a bit more complex than it needs to be for now. We&rsquo;re
+separating out the <code>entry</code> and <code>main</code> functions because doing so will be useful
+later.
+</p>
+
+<p>
+If you haven&rsquo;t seen C before, that&rsquo;s OK&#x2013;all this program is doing is printing a
+string to the screen and then exiting. The reason we&rsquo;ve written it in C is that
+we already have a compiler from C to machine code, <code>gcc</code>. So, let&rsquo;s make sure
+our program works:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ gcc -o program program.c
+$ ./program
+4000000000000$
+</pre>
+</div>
+
+<p>
+OK, it seems to do the right thing (it&rsquo;s just printing the number, not a
+newline). Let&rsquo;s try to take a look at the code it produced!
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ cat program # the [cat] command prints out the contents of a file
+</pre>
+</div>
+
+<p>
+This command results in a lot of unreadable garbage.  That&rsquo;s not very helpful!
+What&rsquo;s going on here? Some of that stuff is actually x86-64 machine code, in
+binary format. Other parts are sort of boilerplate that tells the operating
+system how to execute this program. We can get a more useful output like this:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">$ gcc -S -masm=intel -m64 program.c
+$ cat program.s
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-asm">	.section        __TEXT,__text,regular,pure_instructions
+	.build_version macos, 10, 14    sdk_version 10, 14
+	.intel_syntax noprefix
+	.globl  _entry                  ## -- Begin function entry
+	.p2align        4, 0x90
+_entry:                                 ## @entry
+	.cfi_startproc
+## %bb.0:
+	push    rbp
+	.cfi_def_cfa_offset 16
+	.cfi_offset rbp, -16
+	mov     rbp, rsp
+	.cfi_def_cfa_register rbp
+	movabs  rax, 4000000000000
+	pop     rbp
+	ret
+	.cfi_endproc
+					## -- End function
+	.globl  _main                   ## -- Begin function main
+	.p2align        4, 0x90
+_main:                                  ## @main
+	.cfi_startproc
+## %bb.0:
+	push    rbp
+	.cfi_def_cfa_offset 16
+	.cfi_offset rbp, -16
+	mov     rbp, rsp
+	.cfi_def_cfa_register rbp
+	sub     rsp, 32
+	mov     dword ptr [rbp - 4], 0
+	mov     dword ptr [rbp - 8], edi
+	mov     qword ptr [rbp - 16], rsi
+	call    _entry
+	lea     rdi, [rip + L_.str]
+	mov     rsi, rax
+	mov     al, 0
+	call    _printf
+	xor     ecx, ecx
+	mov     dword ptr [rbp - 20], eax ## 4-byte Spill
+	mov     eax, ecx
+	add     rsp, 32
+	pop     rbp
+	ret
+	.cfi_endproc
+					## -- End function
+	.section        __TEXT,__cstring,cstring_literals
+L_.str:                                 ## @.str
+	.asciz  "%lli"
+
+
+.subsections_via_symbols
+</pre>
+</div>
+
+<p>
+This is called <i>assembly language</i>. It&rsquo;s basically a human-readable form of
+machine-code. Translating between assembly language and machine code is a simple
+mechanical process; we call this <i>assembling</i>.
+</p>
+
+<p>
+Let&rsquo;s look at the code above. There are two big sections, starting with <code>_entry</code>
+and <code>_main</code><sup><a id="fnr.1" class="footref" href="#fn.1">1</a></sup>. These correspond to the two functions, <code>entry</code> and
+<code>main</code>, in our C code.
+</p>
+
+<p>
+In order to write our compiler, we&rsquo;re going to replace the <code>entry</code> function
+(we&rsquo;ve called it that because it&rsquo;s the <i>entry point</i> to the code our compiler is
+producing). We&rsquo;re going to replace it with code that looks a lot like the code
+up there, but simpler. We&rsquo;re going to split that code out into its own file, and
+that&rsquo;s what our compiler will produce.
+</p>
+
+<p>
+First, we&rsquo;ll modify our C program:
+</p>
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 2: </span><code>runtime.c</code></label><pre class="src src-c">#include &lt;stdio.h&gt;
+#include &lt;inttypes.h&gt;
+
+extern int64_t entry();
+
+int main(int argc, char **argv) {
+  printf("%" PRIi64, entry());
+  return 0;
+}
+</pre>
+</div>
+
+<p>
+This program is called the <i>runtime</i> for our compiler. The runtime will be
+included in every program our compiler produces. Here, it just handles calling
+our function and printing the result. Later we&rsquo;ll extend it to do more things.
+</p>
+
+<p>
+Note that we&rsquo;re writing the runtime in C, but we don&rsquo;t have to&#x2013;we could write
+it in assembly, or some other language that can produce machine code. C is a
+convenient language for this purpose, but it&rsquo;s certainly not the only choice!
+Because we&rsquo;ve written the runtime in C, C&rsquo;s runtime gets included in our
+programs as well.
+</p>
+
+<p>
+We can compile the runtime like this:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">$ gcc -c runtime.c -o runtime.o
+</pre>
+</div>
+
+<p>
+That <code>-c</code> is just telling GCC not to try to compile it into a whole program, but instead to make a chunk of machine code that we can then include in other programs.
+</p>
+
+<p>
+Back to our <code>entry</code> function. We can write it in assembly language like this:
+</p>
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 3: </span><code>program.s</code></label><pre class="src src-asm">global _entry
+_entry:
+	mov rax, 4000000000000
+	ret        
+</pre>
+</div>
+
+<p>
+Line by line, this program:
+</p>
+<ol class="org-ol">
+<li>Declares that it&rsquo;s  going to define one function, called <code>_entry</code></li>
+<li>Starts the <code>_entry</code> function</li>
+<li>Writes the value 4000000000000 into the <code>rax</code> <i>register</i>. We&rsquo;ll talk more
+about registers later; for now, the important thing is that by convention in
+x86-64, the return value of a function goes in <code>rax</code>.</li>
+<li>Returns from the function.</li>
+</ol>
+
+<p>
+We can build this program like this:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">$ nasm program.s -f macho64 -o program.o # change "-f macho64" to "-f elf64" if you're on Linux
+</pre>
+</div>
+
+<p>
+Finally, we can combine the runtime and the program:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">$ gcc program.o runtime.o -o program
+$ ./program
+4000000000000$ 
+</pre>
+</div>
+
+<p>
+I know, I know, here we are running another compiler after we just made our own!
+We wrote that runtime, and we wrote our assembly.  Why do we need GCC again?
+All that&rsquo;s happening here is it&rsquo;s running something called a linker, telling
+these components how to talk to each other.  If you want to see that it&rsquo;s really
+just running the linker, go ahead and run:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">$ gcc program.o runtime.o -o program --verbose
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgfb44160" class="outline-3">
+<h3 id="orgfb44160">The compiler</h3>
+<div class="outline-text-3" id="text-orgfb44160">
+<p>
+OK, so now we know what our compiler needs to do. It needs to turn a &ldquo;program&rdquo; like
+</p>
+
+<div class="org-src-container">
+<pre class="src src-ocaml">4000000000000
+</pre>
+</div>
+
+<p>
+into an assembly-language program like
+</p>
+
+<div class="org-src-container">
+<pre class="src src-asm">global _entry
+_entry:
+	mov rax, 4000000000000
+	ret        
+</pre>
+</div>
+
+<p>
+Let&rsquo;s write a program to do this! We&rsquo;ll write our program in OCaml (a
+programming language we&rsquo;ll discuss in much more detail next time). Here&rsquo;s what
+it might look like:
+</p>
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 4: </span><code>compile.ml</code></label><pre class="src src-ocaml">let compile (program: string): string =
+  String.concat "\n" 
+  [ "global _entry"; 
+  "_entry:"; 
+  Printf.sprintf "\tmov rax, %s" program;
+  "\tret" ]
+</pre>
+</div>
+
+<p>
+This program just makes a list of our assembly-language lines and then glues
+them together with newlines.
+</p>
+
+<p>
+We can see our compiler work if we open up an OCaml interaction environment:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">$ utop
+</pre>
+</div>
+
+<p>
+And in <code>utop</code>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-ocaml">&gt;&gt;&gt; #use "compile.ml";;
+&gt;&gt;&gt; print_endline (compile "4000000000000");;
+global _entry
+_entry:
+	mov rax, 4000000000000
+	ret        
+</pre>
+</div>
+
+<p>
+We can glue everything together like this:
+</p>
+
+<div class="org-src-container">
+<label class="org-src-name"><span class="listing-number">Listing 5: </span><code>compile.ml</code></label><pre class="src src-ocaml">let compile (program: string) : string =
+  String.concat "\n" 
+  ["global _entry";
+  "_entry:";
+  Printf.sprintf "\tmov rax, %s" program;
+  "\tret"]
+
+let compile_to_file (program: string): unit =
+  let file = open_out "program.s" in
+  output_string file (compile program);
+  close_out file
+
+let compile_and_run (program: string): string =
+  compile_to_file program;
+  ignore (Unix.system "nasm program.s -f macho64 -o program.o");
+  ignore (Unix.system "gcc program.o runtime.o -o program");
+  let inp = Unix.open_process_in "./program" in
+  let r = input_line inp in
+  close_in inp; r
+</pre>
+</div>
+
+<p>
+Now in our utop we can run:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-ocaml">&gt;&gt;&gt; #use "compile.ml";;
+&gt;&gt;&gt; utop # compile_to_file "42";;
+- : unit = ()      
+</pre>
+</div>
+
+<p>
+And if we look back inside <code>program.s</code>, we&rsquo;ll see 42.
+</p>
+
+<p>
+And in utop we can run:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-ocaml">&gt;&gt;&gt; utop # compile_and_run "7";;
+- : string = "7"   
+</pre>
+</div>
+
+<p>
+We see it produces 7.  And we can pop out of utop and run:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">$ ./program
+7$ 
+</pre>
+</div>
+
+<p>
+And again we see whatever number we provided as our input progam when we called <code>compile_and_run</code>.
+</p>
+
+<p>
+So&#x2013;that&rsquo;s our first compiler. Next time, we&rsquo;ll talk more about the language
+we&rsquo;re trying to compile. We&rsquo;ll also do a quick introduction to OCaml.
+</p>
+</div>
+</div>
+</div>
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
+
+<div class="footdef"><sup><a id="fn.1" class="footnum" href="#fnr.1">1</a></sup> <div class="footpara"><p class="footpara">
+If you&rsquo;re following these notes on a Linux machine, the underscores
+are probably missing.
+</p></div></div>
+
+
+</div>
+</div></div>
+<div id="postamble" class="status">
+<footer>Content by Doug Woos, with modifications by Sarah E. Chasins<br/>Style adapted from <a href="http://taopeng.me/org-notes-style/">org-notes-style</a></footer>
+</div>
+</body>
+</html>

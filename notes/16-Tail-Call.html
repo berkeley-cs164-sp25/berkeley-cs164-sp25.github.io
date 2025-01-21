@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tail calls</title>
+    <meta name="generator" content="Org mode" />
+    <meta name="author" content="Sarah E. Chasins" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link href="lecture-notes.css" rel="stylesheet" type="text/css" />
+    <script type="text/javascript">
+      // @license magnet:?xt=urn:btih:e95b018ef3580986a04669f1b5879592219e2a7a&dn=public-domain.txt Public Domain
+      <!--/*--><![CDATA[/*><!--*/
+      function CodeHighlightOn(elem, id) {
+        var target = document.getElementById(id);
+        if (null != target) {
+          elem.classList.add("code-highlighted");
+          target.classList.add("code-highlighted");
+        }
+      }
+      function CodeHighlightOff(elem, id) {
+        var target = document.getElementById(id);
+        if (null != target) {
+          elem.classList.remove("code-highlighted");
+          target.classList.remove("code-highlighted");
+        }
+      }
+      /*]]>*/ //-->
+      // @license-end
+    </script>
+  </head>
+  <body>
+    <div id="preamble" class="status">
+      <div class="alert">
+        <span class="bold">Important:</span> These notes are not designed to
+        subsitute for class sessions. Importantly, they do
+        <span class="ital">not</span> cover all content required for the exams
+        or for implementing HWs. These are just an aid for re-implementing the
+        class compiler, after you've already come to class and completed the
+        in-class activities!
+      </div>
+    </div>
+    <div id="content">
+      <header>
+        <h1 class="title">Tail calls</h1>
+      </header>
+      <nav id="table-of-contents">
+        <h2>Table of Contents</h2>
+        <div id="text-table-of-contents">
+          <ul>
+            <li><a href="#org1487777">Tail calls in the interpreter</a></li>
+          </ul>
+        </div>
+      </nav>
+      <p>Here&rsquo;s a little program to sum the first N natural numbers:</p>
+
+      <div class="org-src-container">
+        <pre class="src src-scheme">
+(define (sum n)
+  (if (zero? n)
+    n
+    (+ n (sum (sub1 n)))))
+(print (sum (read-num)))
+</pre
+        >
+      </div>
+
+      <p>
+        What will happen if we call <code>(sum 1000000)</code>? We overflow the
+        stack.
+      </p>
+
+      <p>In our interpreter, we can fix this:</p>
+
+      <div class="org-src-container">
+        <pre class="src src-scheme">
+(define (sum n total)
+  (if (zero? n)
+    total
+    (sum (sub1 n) (+ n total))))
+(print (sum (read-num) 0))
+</pre
+        >
+      </div>
+
+      <p>
+        Our compiler, however, still segfaults. What&rsquo;s going on here? The
+        question isn&rsquo;t why our compiler segfaults&#x2013;why
+        wouldn&rsquo;t it? It has a finite amount of stack space, after all, and
+        we&rsquo;re doing a lot of function calls here. Each call to
+        <code>sum</code> adds a few values to the stack. So why isn&rsquo;t the
+        interpreter overflowing the stack?
+      </p>
+
+      <p>
+        Let&rsquo;s postpone the answer to that question. First, let&rsquo;s
+        look at the assembly instructions we produce for our little
+        <code>sum</code> program:
+      </p>
+
+      <div class="org-src-container">
+        <pre class="src src-asm">
+global _entry
+extern _error
+extern _read_num
+extern _print_value
+extern _print_newline
+_entry:
+	mov [rsp + -24], rdi
+	add rsp, -24
+	call _read_num
+	sub rsp, -24
+	mov rdi, [rsp + -24]
+	mov [rsp + -24], rax
+	mov rax, 0
+	mov [rsp + -32], rax
+	add rsp, -8
+	call _function_sum_957043065
+	sub rsp, -8
+	mov [rsp + -8], rdi
+	mov rdi, rax
+	add rsp, -8
+	call _print_value
+	sub rsp, -8
+	mov rdi, [rsp + -8]
+	mov rax, 159
+	ret
+_function_sum_957043065:
+	mov rax, [rsp + -8]
+	cmp rax, 0
+	mov rax, 0
+	setz al
+	shl rax, 7
+	or rax, 31
+	cmp rax, 31
+	jz _else__2
+	mov rax, [rsp + -16]
+	jmp _continue__3
+_else__2:
+	mov rax, [rsp + -8]
+	sub rax, 4
+	mov [rsp + -40], rax
+	mov rax, [rsp + -8]
+	mov [rsp + -48], rax
+	mov rax, [rsp + -16]
+	mov r8, [rsp + -48]
+	add rax, r8
+	mov [rsp + -48], rax
+	add rsp, -24
+	call _function_sum_957043065
+	sub rsp, -24
+_continue__3:
+	ret
+</pre
+        >
+      </div>
+
+      <p>
+        Look at the end of the program, there. In the <code>else</code> case of
+        our conditional expression, we&rsquo;re pushing a bunch of arguments to
+        the stack and then calling our function. After we come back from that
+        call we&rsquo;ll execute two instructions: we&rsquo;ll restore the stack
+        pointer and then return again. In other words, we&rsquo;re really not
+        doing any work once our function returns! We have this stack frame
+        storing our local variables and function parameters, but we&rsquo;re not
+        accessing any of them! It seems like once we&rsquo;re doing that
+        function call, we shouldn&rsquo;t really need an extra stack frame;
+        instead, we should be able to just re-use the one we already
+        have&#x2013;essentially, replacing the <code>call</code> with a
+        <code>jmp</code>.
+      </p>
+
+      <p>
+        When can we do this? Well, we should be able to do this whenever we
+        don&rsquo;t have any work to do after a function is called. If
+        we&rsquo;re just going to return whatever another function returns,
+        without modification, we should be able to re-use our stack frame:
+        we&rsquo;re guaranteed not to need any of the things we&rsquo;ve stored
+        there.
+      </p>
+
+      <p>
+        Function calls in this position are called <i>tail calls</i>. Take a
+        look at this little program:
+      </p>
+
+      <div class="org-src-container">
+        <pre class="src src-scheme">
+(define (f x) (+ 3 x))
+(define (sum-f n total)
+  (if (zero? n)
+    total
+    (sum-f (sub1 n) (+ (f n) total))))
+(print (sum-f (read-num) 0))
+</pre
+        >
+      </div>
+
+      <p>
+        Is the call to <code>f</code> in tail position? No&#x2013;after
+        <code>f</code> returns, we have to do more work.
+      </p>
+
+      <p>How about this program?</p>
+
+      <div class="org-src-container">
+        <pre class="src src-scheme">
+(define (even n) (if (zero? n) true (odd (sub1 n))))
+(define (odd n) (if (zero? n) false (not (even n))))
+(print (even (read-num)))
+</pre
+        >
+      </div>
+
+      <p>
+        Is <code>even</code>&rsquo;s call to <code>odd</code> a tail call? Yes.
+        Is <code>odd</code>&rsquo;s call to <code>even</code> a tail call?
+        No&#x2013;after <code>even</code> returns, there&rsquo;s more work to do
+        (specifically, negating the value). We&rsquo;ve decided that we want to
+        compile function calls differently when they are in tail position. So,
+        let&rsquo;s add an argument to the compiler that will be
+        <code>true</code> if the expression being compiled is in tail position
+        and <code>false</code> otherwise. We&rsquo;ll need to add it to every
+        call to <code>compile_exp</code>; here are some of the more interesting
+        ones:
+      </p>
+
+      <div class="org-src-container">
+        <label class="org-src-name"
+          ><span class="listing-number">Listing 1: </span
+          ><code>compile.ml</code></label
+        >
+        <pre class="src src-ocaml">
+let rec compile_exp (defns : defn list) (tab : int symtab) (stack_index : int)
+    (exp : s_exp) (is_tail : bool) : directive list =
+  match exp with
+  (* ... *)
+  | Lst [Sym "print"; e] -&gt;
+      compile_exp defns tab stack_index e false
+      @ [ Mov (stack_address stack_index, Reg Rdi)
+	; Mov (Reg Rdi, Reg Rax)
+	; Add (Reg Rsp, Imm (align_stack_index stack_index))
+	; Call "print_value"
+	; Sub (Reg Rsp, Imm (align_stack_index stack_index))
+	; Mov (Reg Rdi, stack_address stack_index)
+	; Mov (Reg Rax, operand_of_bool true) ]
+  | Lst (Sym "do" :: exps) when List.length exps &gt; 0 -&gt;
+      List.mapi
+	(fun i exp -&gt;
+	  compile_exp defns tab stack_index exp
+	    (if i = List.length exps - 1 then is_tail else false))
+	exps
+      |&gt; List.concat
+  | Lst [Sym "if"; test_exp; then_exp; else_exp] -&gt;
+      let else_label = Util.gensym "else" in
+      let continue_label = Util.gensym "continue" in
+      compile_exp defns tab stack_index test_exp false
+      @ [Cmp (Reg Rax, operand_of_bool false); Jz else_label]
+      @ compile_exp defns tab stack_index then_exp is_tail
+      @ [Jmp continue_label] @ [Label else_label]
+      @ compile_exp defns tab stack_index else_exp is_tail
+      @ [Label continue_label]
+  | Lst [Sym "+"; e1; e2] -&gt;
+      compile_exp defns tab stack_index e1 false
+      @ [Mov (stack_address stack_index, Reg Rax)]
+      @ compile_exp defns tab (stack_index - 8) e2 false
+      @ [Mov (Reg R8, stack_address stack_index)]
+      @ [Add (Reg Rax, Reg R8)]
+</pre
+        >
+      </div>
+
+      <p>In our recursive calls, we have essentially two cases:</p>
+
+      <ul class="org-ul">
+        <li>
+          We&rsquo;re compiling a subexpression and then doing something else.
+          When we compile the subexpression <code>is_tail</code> should be
+          <code>false</code>. This is the case, for instance, with both operands
+          to <code>+</code> and every expression in the body of a
+          <code>do</code> except the last one.
+        </li>
+        <li>
+          We&rsquo;re compiling a subexpression and then not doing anything
+          else. If we&rsquo;re already in tail position, this subexpression is
+          also in tail position. Otherwise, it&rsquo;s not. This is the case for
+          both the <code>then</code> and <code>else</code> cases of an
+          <code>if</code>, and the last expression in a <code>do</code>.
+        </li>
+      </ul>
+
+      <p>
+        When we call <code>compile_exp</code>, either to compile the body of a
+        function or our main program body, <code>is_tail</code> will start out
+        as <code>true</code>.
+      </p>
+
+      <div class="org-src-container">
+        <label class="org-src-name"
+          ><span class="listing-number">Listing 2: </span
+          ><code>compile.ml</code></label
+        >
+        <pre class="src src-ocaml">
+let compile_defn defns defn =
+  let ftab =
+    defn.args |&gt; List.mapi (fun i arg -&gt; (arg, -8 * (i + 1))) |&gt; Symtab.of_list
+  in
+  [Label (defn_label defn.name)]
+  @ compile_exp defns ftab (-8 * (List.length defn.args + 1)) defn.body true
+  @ [Ret]
+
+let compile (program : s_exp list) : string =
+  let defns, body = defns_and_body program in
+  [ Global "entry"
+  ; Extern "error"
+  ; Extern "read_num"
+  ; Extern "print_value"
+  ; Extern "print_newline"
+  ; Label "entry" ]
+  @ compile_exp defns Symtab.empty (-8) body true
+  @ [Ret]
+  @ (List.map (compile_defn defns) defns |&gt; List.concat)
+  |&gt; List.map string_of_directive
+  |&gt; String.concat "\n"
+</pre
+        >
+      </div>
+
+      <p>
+        Now we need to use <code>is_tail</code> to reuse the current stack frame
+        if a function call is in tail position. We can add another case like
+        this:
+      </p>
+
+      <div class="org-src-container">
+        <label class="org-src-name"
+          ><span class="listing-number">Listing 3: </span
+          ><code>compile.ml</code></label
+        >
+        <pre class="src src-ocaml">
+let rec compile_exp (defns : defn list) (tab : int symtab) (stack_index : int)
+    (exp : s_exp) (is_tail : bool) : directive list =
+  match exp with
+       (* ... *)
+  | Lst (Sym f :: args) when is_defn defns f &amp;&amp; is_tail -&gt;
+      let defn = get_defn defns f in
+      if List.length args = List.length defn.args then
+	let compiled_args =
+	  args
+	  |&gt; List.mapi (fun i arg -&gt;
+		 compile_exp defns tab (stack_index - (8 * i)) arg false
+		 @ [Mov (stack_address (stack_index - (8 * i)), Reg Rax)])
+	  |&gt; List.concat
+	in
+	let moved_args =
+	  args
+	  |&gt; List.mapi (fun i _ -&gt;
+		 [ Mov (Reg R8, stack_address (stack_index - (8 * i)))
+		 ; Mov (stack_address ((i + 1) * -8), Reg R8) ])
+	  |&gt; List.concat
+	in
+	compiled_args @ moved_args @ [Jmp (defn_label f)]
+      else raise (BadExpression exp)
+
+</pre
+        >
+      </div>
+
+      <p>
+        We&rsquo;re first compiling each argument and storing it in the next
+        available stack index. We then move all of these arguments to the base
+        of the stack (right after
+        <code>rsp</code>), since that&rsquo;s where function arguments go! Then,
+        we can just jump to the right label. Notice that we&rsquo;re
+        <b>not</b> changing <code>rsp</code> when we call a function in tail
+        position: this is exactly what it means for us to reuse a stack frame.
+      </p>
+
+      <div id="outline-container-org1487777" class="outline-2">
+        <h2 id="org1487777">Tail calls in the interpreter</h2>
+        <div class="outline-text-2" id="text-org1487777">
+          <p>
+            As we saw, our interpreter already seems to be doing this&#x2013;it
+            didn&rsquo;t overflow the stack when we interpreted a tail-recursive
+            program. Why? Well, the interpreter is written in OCaml, which
+            properly implements tail calls by reusing stack frames. So as long
+            as the interpreter&rsquo;s calls to itself are in tail position,
+            everything will work out! See the lecture capture for a little more
+            about this.
+          </p>
+        </div>
+      </div>
+    </div>
+    <div id="postamble" class="status">
+      <footer>
+        Content by Doug Woos, with modifications by Sarah E. Chasins<br />Style
+        adapted from
+        <a href="http://taopeng.me/org-notes-style/">org-notes-style</a>
+      </footer>
+    </div>
+  </body>
+</html>

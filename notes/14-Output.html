@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Output</title>
+    <meta name="generator" content="Org mode" />
+    <meta name="author" content="S. Chasins" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link href="lecture-notes.css" rel="stylesheet" type="text/css" />
+    <script type="text/javascript">
+      // @license magnet:?xt=urn:btih:e95b018ef3580986a04669f1b5879592219e2a7a&dn=public-domain.txt Public Domain
+      <!--/*--><![CDATA[/*><!--*/
+      function CodeHighlightOn(elem, id) {
+        var target = document.getElementById(id);
+        if (null != target) {
+          elem.classList.add("code-highlighted");
+          target.classList.add("code-highlighted");
+        }
+      }
+      function CodeHighlightOff(elem, id) {
+        var target = document.getElementById(id);
+        if (null != target) {
+          elem.classList.remove("code-highlighted");
+          target.classList.remove("code-highlighted");
+        }
+      }
+      /*]]>*/ //-->
+      // @license-end
+    </script>
+  </head>
+  <body>
+    <div id="preamble" class="status">
+      <div class="alert">
+        <span class="bold">Important:</span> These notes are not designed to
+        subsitute for class sessions. Importantly, they do
+        <span class="ital">not</span> cover all content required for the exams
+        or for implementing HWs. These are just an aid for re-implementing the
+        class compiler, after you've already come to class and completed the
+        in-class activities!
+      </div>
+    </div>
+    <div id="content">
+      <header>
+        <h1 class="title">Output</h1>
+      </header>
+      <nav id="table-of-contents">
+        <h2>Table of Contents</h2>
+        <div id="text-table-of-contents">
+          <ul>
+            <li><a href="#orgabbef65">Adding output to the interpreter</a></li>
+            <li><a href="#org7f80f58">Adding output to the compiler</a></li>
+            <li>
+              <a href="#orgca3ef30"
+                >Updating the <code>difftest</code> infrastructure</a
+              >
+            </li>
+          </ul>
+        </div>
+      </nav>
+      <p>
+        Last time we added input &#x2014; <code>read-num</code> &#x2014; and now
+        we&rsquo;re ready to add output! Here&rsquo;s what we&rsquo;re adding
+        today:
+      </p>
+
+      <ul class="org-ul">
+        <li>
+          <code>(print e)</code> prints the value of expression <code>e</code>.
+        </li>
+        <li><code>(newline)</code> prints a newline.</li>
+        <li>
+          <code>(do e1 ... en)</code> evaluates expressions
+          <code>e1</code> through <code>en</code> and evaluates to the value of
+          the last expression, <code>en</code>. Now that we have
+          <code>print</code> and <code>newline</code>, which are useful mostly
+          for their side effects, we might want to do some sequencing!
+          We&rsquo;ll use <code>do</code> for that.
+        </li>
+      </ul>
+
+      <p>
+        We&rsquo;ll be making one other big change. Up until this point,
+        we&rsquo;ve always had our compiler and interpreter print the value we
+        get from evaluating the whole program. Now that we have a way for the
+        programmer to control what gets printed and when, we&rsquo;ll stop
+        printing the final value by default. Just remember that this has
+        changed! It&rsquo;s easy to forget this and get confused about why
+        you&rsquo;re not getting output. Remember to add <code>print</code> as
+        needed!
+      </p>
+
+      <div id="outline-container-orgabbef65" class="outline-2">
+        <h2 id="orgabbef65">Adding output to the interpreter</h2>
+        <div class="outline-text-2" id="text-orgabbef65">
+          <p>
+            As usual, we&rsquo;ll start with our interpreter, and we&rsquo;ll
+            take advantage of OCaml&rsquo;s own features to implement ours. In
+            this case, we use <code>output_string</code> to print both the
+            argument to <code>print</code> and the newline for
+            <code>newline</code>.
+          </p>
+
+          <p>
+            Our <code>print</code> and <code>newline</code> expressions have to
+            evaluate to something, but what? Here we&rsquo;ve chosen
+            <code>Boolean true</code>.
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 1: </span
+              ><code>interp.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let output_channel = ref stdout
+
+let rec interp_exp env (exp : s_exp) : value =
+  match exp with
+  | Lst (Sym "do" :: exps) when List.length exps &gt; 0 -&gt;
+      exps |&gt; List.rev_map (interp_exp env) |&gt; List.hd
+  | Lst [Sym "print"; e] -&gt;
+      interp_exp env e |&gt; string_of_value |&gt; output_string !output_channel ;
+      Boolean true
+  | Lst [Sym "newline"] -&gt;
+      output_string !output_channel "\n" ;
+      Boolean true
+
+</pre
+            >
+          </div>
+
+          <p>
+            Notice that we use <code>rev_map</code> to implement
+            <code>do</code>. This works because <code>rev_map</code> evalutes
+            expressions in the input list from left to right. Now that we have
+            side effects, it&rsquo;s important to know the order in which
+            we&rsquo;re making our recursive calls to <code>interp_exp</code>!
+          </p>
+
+          <p>
+            One other note&#x2014;we&rsquo;ve used an
+            <code>output_channel</code> ref rather than directly using
+            <code>stdout</code> because it&rsquo;s going to make our
+            differential testing infrastructure easier in a moment.
+          </p>
+        </div>
+      </div>
+
+      <div id="outline-container-org7f80f58" class="outline-2">
+        <h2 id="org7f80f58">Adding output to the compiler</h2>
+        <div class="outline-text-2" id="text-org7f80f58">
+          <p>
+            Next let&rsquo;s start adjusting our compiler. First things
+            first&#x2014;let&rsquo;s get rid of that old
+            <code>print_value</code> call that used to wrap our call to
+            <code>entry</code>!
+          </p>
+
+          <p>
+            We&rsquo;ll also want a C function for <code>print_newline</code>,
+            just like we added last time for <code>read-num</code>. Fortunately
+            we don&rsquo;t have to add any fresh C code for <code>print</code>.
+            After all, we already have <code>print_value</code> for printing out
+            values!
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 2: </span
+              ><code>runtime.c</code></label
+            >
+            <pre class="src src-c">
+int main(int argc, char **argv) {
+  void *heap = (void *)malloc(4096);
+  entry(heap);
+  return 0;
+}
+
+void print_newline() {
+  printf("\n");
+}
+</pre
+            >
+          </div>
+
+          <p>
+            First let&rsquo;s tell the assembler that it can count on us to
+            provide <code>print_value</code> and <code>print_newline</code> via
+            our <code>Extern</code> directives.
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 3: </span
+              ><code>compile.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let compile (program : s_exp) : string =
+  [ Global "entry"
+  ; Extern "error"
+  ; Extern "read_num"
+  ; Extern "print_value"
+  ; Extern "print_newline"
+  ; Label "entry" ]
+  @ compile_exp Symtab.empty (-8) program
+  @ [Ret]
+  |&gt; List.map string_of_directive
+  |&gt; String.concat "\n"
+
+</pre
+            >
+          </div>
+
+          <p>
+            And now we can go ahead and start using <code>print_value</code> and
+            <code>print_newline</code>. This looks a lot like when we called our
+            runtime&rsquo;s <code>read_num</code> function. There are a couple
+            interesting differences though. First, our
+            <code>read-num</code> expression could rely on our runtime&rsquo;s
+            <code>read_num</code> function to put the appropriate value in
+            <code>rax</code>. This time we&rsquo;ll have to handle that
+            ourselves. We&rsquo;ll just put our runtime representation of
+            <code>true</code> into <code>rax</code>.
+          </p>
+
+          <p>
+            We have one more obstacle to handle. Unlike the other C functions
+            we&rsquo;ve called from our assembly code,
+            <code>print_value</code> takes an argument! Fortunately we already
+            know where the C calling convention expects to find a
+            function&rsquo;s first argument. We took advantage of this
+            information to get access to our heap address. Recall that we find
+            our heap address in <code>rdi</code> because we passed a pointer to
+            the heap as the first argument into the call to <code>entry</code>.
+            So we know C functions are going to look for the first argument in
+            <code>rdi</code>. For our <code>print</code>, we&rsquo;ll first save
+            our current heap address on the stack, then copy the contents of
+            <code>rax</code> into <code>rdi</code>, so that
+            <code>print_value</code> can find it.
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 4: </span
+              ><code>compile.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let rec compile_exp (tab : int symtab) (stack_index : int) (exp : s_exp) :
+    directive list =
+  match exp with
+  | Lst (Sym "do" :: exps) when List.length exps &gt; 0 -&gt;
+      List.concat_map (compile_exp tab stack_index) exps
+  | Lst [Sym "print"; e] -&gt;
+      compile_exp tab stack_index e
+      @ [ Mov (stack_address stack_index, Reg Rdi)
+        ; Mov (Reg Rdi, Reg Rax)
+        ; Add (Reg Rsp, Imm (align_stack_index stack_index))
+        ; Call "print_value"
+        ; Sub (Reg Rsp, Imm (align_stack_index stack_index))
+        ; Mov (Reg Rdi, stack_address stack_index)
+        ; Mov (Reg Rax, operand_of_bool true) ]
+  | Lst [Sym "newline"] -&gt;
+      [ Mov (stack_address stack_index, Reg Rdi)
+      ; Add (Reg Rsp, Imm (align_stack_index stack_index))
+      ; Call "print_newline"
+      ; Sub (Reg Rsp, Imm (align_stack_index stack_index))
+      ; Mov (Reg Rdi, stack_address stack_index)
+      ; Mov (Reg Rax, operand_of_bool true) ]
+</pre
+            >
+          </div>
+        </div>
+      </div>
+
+      <div id="outline-container-orgca3ef30" class="outline-2">
+        <h2 id="orgca3ef30">
+          Updating the <code>difftest</code> infrastructure
+        </h2>
+        <div class="outline-text-2" id="text-orgca3ef30">
+          <p>
+            Now we&rsquo;re ready to update our differential testing
+            infrastrcuture. We&rsquo;ll make two big changes here. We&rsquo;ll
+            start comparing all input that the compiler writes to the output
+            channel with all input that the interpreter writes to the output
+            channel. We&rsquo;ll also make it easy to test programs with
+            pre-supplied input data.
+          </p>
+
+          <p>
+            Don&rsquo;t bother diving into <code>interp_io</code>. It&rsquo;s
+            just making it easy for us to pipe input into our programs and grab
+            output out of them. What&rsquo;s interesting for us is that
+            <code>interp_err</code> now accepts a new argument,
+            <code>input</code>, which is the &ldquo;user input&rdquo;
+            we&rsquo;ll feed to the program.
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 5: </span
+              ><code>interp.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let interp (program : string) : unit =
+  interp_exp Symtab.empty (parse program) |&gt; ignore
+
+let interp_io (program : string) (input : string) =
+  let input_pipe_ex, input_pipe_en = Unix.pipe () in
+  let output_pipe_ex, output_pipe_en = Unix.pipe () in
+  input_channel := Unix.in_channel_of_descr input_pipe_ex ;
+  set_binary_mode_in !input_channel false ;
+  output_channel := Unix.out_channel_of_descr output_pipe_en ;
+  set_binary_mode_out !output_channel false ;
+  let write_input_channel = Unix.out_channel_of_descr input_pipe_en in
+  set_binary_mode_out write_input_channel false ;
+  let read_output_channel = Unix.in_channel_of_descr output_pipe_ex in
+  set_binary_mode_in read_output_channel false ;
+  output_string write_input_channel input ;
+  close_out write_input_channel ;
+  interp program ;
+  close_out !output_channel ;
+  let r = input_all read_output_channel in
+  input_channel := stdin ;
+  output_channel := stdout ;
+  r
+
+let interp_err (program : string) (input : string) : string =
+  try interp_io program input with BadExpression _ -&gt; "ERROR"
+</pre
+            >
+          </div>
+
+          <p>
+            Next let&rsquo;s tackle the compiler. We&rsquo;ll make the same
+            changes, adding <code>compile_and_run_io</code>, which handles
+            submitting input and accepting output. And
+            <code>compile_and_run_err</code> now accepts the new
+            <code>input</code> parameter.
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 6: </span
+              ><code>compile.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let compile_and_run_io (program : string) (input : string) : string =
+  compile_to_file program ;
+  ignore (Unix.system "nasm program.s -f macho64 -o program.o") ;
+  ignore (Unix.system "gcc program.o runtime.c -o program") ;
+  let inp, outp = Unix.open_process "./program" in
+  output_string outp input ;
+  close_out outp ;
+  let r = input_all inp in
+  close_in inp ; r
+
+let compile_and_run_err (program : string) (input : string) : string =
+  try compile_and_run_io program input with BadExpression _ -&gt; "ERROR"
+</pre
+            >
+          </div>
+
+          <p>
+            One last change. Previously, <code>difftest</code> took a list of
+            strings as input, with each string representing a program. Now
+            we&rsquo;ll want it to take a list of
+            <code>(string * string)</code> pairs, where the first string
+            represents the program and the second string represents the input
+            we&rsquo;ll feed to the program. And we&rsquo;ll update our calls to
+            <code>compile_and_run_err</code> and <code>interp_err</code> to pass
+            in those inputs. And of course, we&rsquo;ll replace our old list of
+            <code>string</code> examples with
+            <code>(string * string)</code> examples. Here, our one example is
+            the program <code>(print (read-num))</code>, and we feed it input
+            <code>1</code>, so the test program will print <code>1</code>.
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 7: </span
+              ><code>compile.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let difftest (examples : (string * string) list) =
+  let results =
+    List.map
+      (fun (ex, i) -&gt; (compile_and_run_err ex i, Interp.interp_err ex i))
+      examples
+  in
+  List.for_all (fun (r1, r2) -&gt; r1 = r2) results
+
+let test () = difftest [("(print (read-num))", "1")]
+</pre
+            >
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="postamble" class="status">
+      <footer>
+        Content by Doug Woos, with modifications by Sarah E. Chasins<br />Style
+        adapted from
+        <a href="http://taopeng.me/org-notes-style/">org-notes-style</a>
+      </footer>
+    </div>
+  </body>
+</html>

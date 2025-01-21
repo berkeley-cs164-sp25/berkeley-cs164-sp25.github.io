@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Naming expressions with let: Compiler Edition</title>
+    <meta name="generator" content="Org mode" />
+    <meta name="author" content="S. Chasins" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link
+      href="https://www.dougwoos.com/assets/lecture-notes.css"
+      rel="stylesheet"
+      type="text/css"
+    />
+    <script type="text/javascript">
+      // @license magnet:?xt=urn:btih:e95b018ef3580986a04669f1b5879592219e2a7a&dn=public-domain.txt Public Domain
+      <!--/*--><![CDATA[/*><!--*/
+      function CodeHighlightOn(elem, id) {
+        var target = document.getElementById(id);
+        if (null != target) {
+          elem.classList.add("code-highlighted");
+          target.classList.add("code-highlighted");
+        }
+      }
+      function CodeHighlightOff(elem, id) {
+        var target = document.getElementById(id);
+        if (null != target) {
+          elem.classList.remove("code-highlighted");
+          target.classList.remove("code-highlighted");
+        }
+      }
+      /*]]>*/ //-->
+      // @license-end
+    </script>
+  </head>
+  <body>
+    <div id="content">
+      <header>
+        <h1 class="title">Naming expressions with let: Compiler Edition</h1>
+      </header>
+      <nav id="table-of-contents">
+        <h2>Table of Contents</h2>
+        <div id="text-table-of-contents">
+          <ul>
+            <li><a href="#org349e57c">Names in the compiler</a></li>
+            <li><a href="#org341bed1">Homework 3</a></li>
+          </ul>
+        </div>
+      </nav>
+      <p>
+        We are in the midst of adding support for names. Recall that our
+        language will support OCaml-style variable binding: variables are
+        immutable, and are bound in expressions using <code>let</code>. Some
+        examples:
+      </p>
+
+      <div class="org-src-container">
+        <pre class="src src-lisp">
+(let ((x 1)) x) ; =&gt; 1                                                                                 
+(let ((x 3)) (let ((y (+ x 2)) (+ x y))) ; =&gt; 8                                                        
+(let ((x 3)) (let ((x (+ x 2)) (+ x x))) ; =&gt; 10                                                       
+</pre
+        >
+      </div>
+
+      <div id="outline-container-org349e57c" class="outline-2">
+        <h2 id="org349e57c">Names in the compiler</h2>
+        <div class="outline-text-2" id="text-org349e57c">
+          <p>In the compiler, we&rsquo;ll start with <code>let</code>:</p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 1: </span
+              ><code>compile.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let rec compile_exp (stack_index : int) (exp : s_exp) : directive list =
+  match exp with
+  | Lst [Sym "let"; Lst [Lst [Sym var; e]]; body] -&gt;
+    compile_exp stack_index e @ ...
+</pre
+            >
+          </div>
+
+          <p>
+            Once we&rsquo;ve compiled <code>e</code>, what should we do with it?
+            We know we want to compile <code>body</code>, and somehow have
+            references to <code>x</code> in <code>body</code> be able to
+            &ldquo;find&rdquo; the value of <code>e</code>. We definitely
+            can&rsquo;t leave that value in <code>rax</code>&#x2013;as we saw
+            last time, it will get overwritten right away. We&rsquo;ll need to
+            &ldquo;remember&rdquo; this value for later use. Let&rsquo;s put it
+            in memory!
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 2: </span
+              ><code>compile.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let stack_address (stack_index : int) = MemOffset (Reg Rsp, Imm stack_index)
+
+let rec compile_exp (stack_index : int) (exp : s_exp) : directive list =
+  match exp with
+  | Lst [Sym "let"; Lst [Lst [Sym var; e]]; body] -&gt;
+    compile_exp stack_index e @ [Mov (stack_address stack_index, Reg Rax)] @ ...
+</pre
+            >
+          </div>
+
+          <p>
+            (The <code>stack_address</code> helper function lets us avoid a
+            little repetition; we&rsquo;ll want to rewrite the stack code from
+            last time to use it as well).
+          </p>
+
+          <p>
+            Now we want to compile <code>body</code>, but make sure our compiler
+            knows to get the right value from memory if it runs into
+            <code>Sym var</code>. Just like in the interpreter, we can do this
+            with a symbol table. In the interpreter, our table mapped variables
+            to values; here, we&rsquo;ll need to map variables to stack indexes.
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 3: </span
+              ><code>compile.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let stack_address (stack_index : int) = MemOffset (Reg Rsp, Imm stack_index)
+
+let rec compile_exp (tab : int symtab) (stack_index : int) (exp : s_exp) : directive list =
+  match exp with
+  | Lst [Sym "let"; Lst [Lst [Sym var; e]]; body] -&gt;
+    compile_exp tab stack_index e @ [Mov (stack_address stack_index, Reg Rax)] @
+    compile_exp (Symtab.add var stack_index tab) (stack_index - 8) body
+  | Sym var when Symtab.mem var tab -&gt;
+    [Mov (Reg Rax, stack_address (Symtab.find var tab))]
+</pre
+            >
+          </div>
+
+          <p>
+            Here&rsquo;s what the compiler produces for
+            <code>(let ((x 1)) (+ x 2))</code>:
+          </p>
+
+          <div class="org-src-container">
+            <pre class="src src-asm">
+entry:
+        mov rax, 4
+        mov [rsp + -8], rax
+        mov rax, [rsp + -8]
+        mov [rsp + -16], rax
+        mov rax, 8
+        mov r8, [rsp + -16]
+        add rax, r8
+        ret
+</pre
+            >
+          </div>
+        </div>
+      </div>
+
+      <div id="outline-container-org341bed1" class="outline-2">
+        <h2 id="org341bed1">Homework 3</h2>
+        <div class="outline-text-2" id="text-org341bed1">
+          <p>
+            We spent some time talking about Homework 3; see the lecture capture
+            for details.
+          </p>
+        </div>
+      </div>
+    </div>
+    <div id="postamble" class="status">
+      <footer>
+        Content by Doug Woos, with modifications by Sarah E. Chasins<br />Style
+        adapted from
+        <a href="http://taopeng.me/org-notes-style/">org-notes-style</a>
+      </footer>
+    </div>
+  </body>
+</html>

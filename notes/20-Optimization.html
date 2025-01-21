@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Optimization: constant folding</title>
+    <meta name="generator" content="Org mode" />
+    <meta name="author" content="Sarah E. Chasins" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link href="lecture-notes.css" rel="stylesheet" type="text/css" />
+    <script type="text/javascript">
+      // @license magnet:?xt=urn:btih:e95b018ef3580986a04669f1b5879592219e2a7a&dn=public-domain.txt Public Domain
+      <!--/*--><![CDATA[/*><!--*/
+      function CodeHighlightOn(elem, id) {
+        var target = document.getElementById(id);
+        if (null != target) {
+          elem.classList.add("code-highlighted");
+          target.classList.add("code-highlighted");
+        }
+      }
+      function CodeHighlightOff(elem, id) {
+        var target = document.getElementById(id);
+        if (null != target) {
+          elem.classList.remove("code-highlighted");
+          target.classList.remove("code-highlighted");
+        }
+      }
+      /*]]>*/ //-->
+      // @license-end
+    </script>
+  </head>
+  <body>
+    <div id="preamble" class="status">
+      <div class="alert">
+        <span class="bold">Important:</span> These notes are not designed to
+        subsitute for class sessions. Importantly, they do
+        <span class="ital">not</span> cover all content required for the exams
+        or for implementing HWs. These are just an aid for re-implementing the
+        class compiler, after you've already come to class and completed the
+        in-class activities!
+      </div>
+    </div>
+    <div id="content">
+      <header>
+        <h1 class="title">Optimization: constant folding</h1>
+      </header>
+      <nav id="table-of-contents">
+        <h2>Table of Contents</h2>
+        <div id="text-table-of-contents">
+          <ul>
+            <li>
+              <a href="#org013522a">Optimization: the preliminaries</a>
+              <ul>
+                <li><a href="#org0867ad5">Why do we call it this?</a></li>
+                <li>
+                  <a href="#org3612434"
+                    >What <i>are</i> we doing? If we&rsquo;re not making things
+                    optimal?</a
+                  >
+                </li>
+                <li>
+                  <a href="#org0a9ef4f">Where does optimization happen?</a>
+                </li>
+                <li><a href="#orgf3d19c3">What about ordering?</a></li>
+              </ul>
+            </li>
+            <li><a href="#org10e213c">Constant folding</a></li>
+            <li>
+              <a href="#orgba70a3c">Discussion</a>
+              <ul>
+                <li><a href="#org76a4661">Where can I learn more?</a></li>
+              </ul>
+            </li>
+          </ul>
+        </div>
+      </nav>
+      <p>
+        Today we&rsquo;re going to talk about about the role of optimization in
+        compilers. We&rsquo;ll also see how to extend our class compiler with a
+        particular optimization, constant folding.
+      </p>
+
+      <div id="outline-container-org013522a" class="outline-2">
+        <h2 id="org013522a">Optimization: the preliminaries</h2>
+        <div class="outline-text-2" id="text-org013522a">
+          <p>
+            Let&rsquo;s start by talking a bit about optimization in general,
+            and then we&rsquo;ll dive in on implementation.
+          </p>
+        </div>
+
+        <div id="outline-container-org0867ad5" class="outline-3">
+          <h3 id="org0867ad5">Why do we call it this?</h3>
+          <div class="outline-text-3" id="text-org0867ad5">
+            <p>
+              First let&rsquo;s talk about this name, optimization. I&rsquo;ll
+              indulge in a brief rant about this name. It&rsquo;s rather
+              misleading. When we do &ldquo;optimization&rdquo; in the compiler,
+              we&rsquo;re trying to make programs better. What we&rsquo;re not
+              doing (or even defining) is making them optimal. So it
+              doesn&rsquo;t make a ton of sense to say optimizing.
+            </p>
+
+            <p>
+              Now, there are variants that do actually optimize, for some
+              definition of optimal. They had to invent a new term for that,
+              <i>superoptimization</i>. In superoptimization, we define a space
+              of possible programs and search for the best program in that
+              space, for some definition of best. For instance, we might decide
+              that we&rsquo;re searching all sequences of instructions up to
+              length 5 that perform the same task as the 10 instructions
+              we&rsquo;re optimizing. And then if we have a cost metric, we can
+              pick the sequence of 5 instructions that&rsquo;s best according to
+              that cost metric.
+            </p>
+
+            <p>
+              All of which to say, optimization isn&rsquo;t a particularly
+              sensible name. But it&rsquo;s the standard name that we use for
+              these techniques in the field, so we&rsquo;ll go ahead and call it
+              optimization anyway. We&rsquo;ll even try not to be too upset
+              about it.
+            </p>
+          </div>
+        </div>
+
+        <div id="outline-container-org3612434" class="outline-3">
+          <h3 id="org3612434">
+            What <i>are</i> we doing? If we&rsquo;re not making things optimal?
+          </h3>
+          <div class="outline-text-3" id="text-org3612434">
+            <p>
+              Well, we&rsquo;re trying to make them better. Here&rsquo;s our
+              list of criteria, for making a successful optimizer:
+            </p>
+            <ol class="org-ol">
+              <li>Preserve the meaning of the program.</li>
+              <li>Make the program “better”</li>
+            </ol>
+
+            <p>Q: What do you think we mean by better?</p>
+
+            <p>Here are a few things we might mean:</p>
+            <ul class="org-ul">
+              <li>
+                runs faster
+                <ul class="org-ul">
+                  <li>runs in less time on my computer</li>
+                  <li>better worst-case asymptotic execution time</li>
+                  <li>(note: these two items above are really different)</li>
+                </ul>
+              </li>
+              <li>
+                lower memory consumption
+                <ul class="org-ul">
+                  <li>measured</li>
+                  <li>or worst-case asymptotic</li>
+                  <li>(same pattern as above)</li>
+                </ul>
+              </li>
+              <li>
+                lower energy consumption
+                <ul class="org-ul">
+                  <li>
+                    (note: the CPU is the big energy consumer, so people often
+                    use run time as proxy)
+                  </li>
+                </ul>
+              </li>
+              <li>small program size</li>
+              <li>
+                no redundant work
+                <ul class="org-ul">
+                  <li>(relates to the faster idea)</li>
+                </ul>
+              </li>
+              <li>
+                more effective use of the hardware
+                <ul class="org-ul">
+                  <li>(e.g., better cache utilization)</li>
+                </ul>
+              </li>
+            </ul>
+
+            <p>
+              Here are some other things that we probably think make programs
+              better, but which optimizers aren&rsquo;t well placed to tackle:
+            </p>
+            <ul class="org-ul">
+              <li>
+                readability
+                <ul class="org-ul">
+                  <li>
+                    (by the time we&rsquo;re doing optimization, we&rsquo;re
+                    about to produce assembly, and humans probably aren&rsquo;t
+                    looking at it much anymore!)
+                  </li>
+                </ul>
+              </li>
+              <li>
+                correctness
+                <ul class="org-ul">
+                  <li>
+                    (we already decided the optimizer had to preserve the
+                    meaning of the program; it would be frustrating if our
+                    compiler was changing our programs&rsquo; meanings!)
+                  </li>
+                </ul>
+              </li>
+            </ul>
+
+            <p>
+              In lecture, we take some time to talk about each of these and how
+              often we&rsquo;re ending up doing them. For instance, most of the
+              time&#x2014;with some exceptions&#x2014;we&rsquo;re not changing
+              the worst-case asymptotic execution time of input programs in the
+              optimizer. If you try plotting the runtime of a given program with
+              different input sizes for a well-optimized compiler vs. an
+              unoptimized compiler&#x2014;or even C++ vs.
+              Python&#x2014;you&rsquo;ll see a difference in performance, but it
+              will probably be a constant factor. Most compilers aren&rsquo;t
+              doing algorithmic changes that alter how the program works.
+              It&rsquo;s not that it&rsquo;s not possible! Some transformations
+              do actually change the big O analysis. But it&rsquo;s safe to
+              assume that the common performance-focused goal, for most
+              optimizers at the moment, is to improve performance by a constant
+              factor, in order to improve execution time on some set of
+              computers that we care about.
+            </p>
+
+            <p>
+              Small program size also deserves a bit of a discussion. If we see
+              a 10-line program and a million-line program that do the same
+              thing, we often prefer the short one. In part, we use it as a
+              proxy for performance, but we also just like small programs for
+              their own sake. They&rsquo;re easier to keep around, easier to
+              move. We do care about this, at least a little, in our compiler.
+              If it&rsquo;s a choice between a 10-line and a million-line
+              program, and the run time of the million-line program is 10%
+              faster, we&rsquo;ll probably still want to go with producing the
+              10-line program. But if it&rsquo;s a choice between a 10-line
+              program and a 20-line program, and the 20-line program executes
+              10% faster, we may be willing to take the longer program. We can
+              often do some amount of trading off program size for speed.
+            </p>
+
+            <p>
+              We&rsquo;ll mostly focus on making programs faster rather than on
+              the other goals you may have brainstormed, but we can use some of
+              the same techniques for the other goals.
+            </p>
+          </div>
+        </div>
+
+        <div id="outline-container-org0a9ef4f" class="outline-3">
+          <h3 id="org0a9ef4f">Where does optimization happen?</h3>
+          <div class="outline-text-3" id="text-org0a9ef4f">
+            <p>
+              Let&rsquo;s take a moment to zoom out and think about how our
+              whole compiler is structured.
+            </p>
+
+            <figure id="orgaee88af">
+              <img
+                src="./imgs/compiler-diagram.png"
+                alt="compiler-diagram.png"
+              />
+            </figure>
+
+            <p>
+              We have the input program string. The tokenizer (or lexer)
+              tokenizes it into tokens. The parser parses the tokens into an
+              AST. The code generator generates assembly from the AST. And the
+              linker (and assembler) produce machine code from the assembly.
+              This process takes us all the way from source code to machine
+              code. It doesn&rsquo;t look like we need an optimizer along the
+              way. And we don&rsquo;t! But we can add some if we want.
+            </p>
+
+            <p>
+              There are a couple places where we can add them. It&rsquo;s very
+              common to add optimizers once we have ASTs, and we can use them to
+              transform from one AST to an equivalent AST that will produce more
+              efficient assembly. This is the style of optimizer we&rsquo;ll see
+              today.
+            </p>
+
+            <p>
+              We can also do <i>peephole optimization</i>, which works not on
+              ASTs but on assembly. See lecture capture for a quick example of
+              how peephole optimization works.
+            </p>
+          </div>
+        </div>
+
+        <div id="outline-container-orgf3d19c3" class="outline-3">
+          <h3 id="orgf3d19c3">What about ordering?</h3>
+          <div class="outline-text-3" id="text-orgf3d19c3">
+            <p>
+              You may notice from the diagram above that we can have multiple
+              optimizations, all of which transform from AST to AST. This may
+              make you wonder&#x2014;how do we know how to order them? This is
+              an especially big question for industrial compilers which have a
+              lot of these optimization passes, often hundreds and hundreds of
+              them. And the order really matters! It could be that optimization
+              A will find only 3 places to improve if we run it alone, but 300
+              if we run it after optimization B. So how do we know how to order
+              our optimization passes? Well the short answer is, we don&rsquo;t.
+            </p>
+
+            <p>
+              Deciding how to order optimizations in a compiler is a classic
+              problem called the <i>phase-ordering</i> problem. And basically
+              it&rsquo;s still a big open question how we should do this. In
+              fact, it&rsquo;s even more complicated than just picking one slot
+              for each of x optimizations. Sometimes we run optimization A and
+              find 100 places where we can improve things, then run optimization
+              B which changes the AST, and then if we run optimization A again
+              we&rsquo;ll find another 100 places where we can improve things!
+              So since we don&rsquo;t have a clean, theoretical framework for
+              how to order these optimizations, what do production compilers do?
+              Essentially, run these optimizations over and over again. Keep
+              circling back around, hoping to find more places to improve
+              everything.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div id="outline-container-org10e213c" class="outline-2">
+        <h2 id="org10e213c">Constant folding</h2>
+        <div class="outline-text-2" id="text-org10e213c">
+          <p>Enough of this chit chat! Let&rsquo;s implement some stuff.</p>
+
+          <p>
+            Here&rsquo;s our problem: programmers are doing good programming
+            practices and making their programs readable by doing extra
+            computation. For instance, say we know a time limit in our program
+            should be 5 minutes, but our program needs it in milliseconds. Maybe
+            we write
+            <code
+              >(let ((time-limit (* 5 (* seconds-per-minute
+              milliseconds-per-second)))) in ...)</code
+            >
+            even though we know <code>time-limit</code> will always turn out to
+            be 300000. We want to let the programmer do that, but we still want
+            to give them the blazing fast program execution experience of having
+            written <code>(let ((time-limit 300000)) in ...)</code>. And we can
+            give that to them, via the power of <i>constant folding</i>.
+            Constant folding is when we recognize that a given expression is a
+            constant, we go ahead and evaluate the expression to find the
+            constant, then replace the expression with the constant&#x2014;all
+            at compile time.
+          </p>
+
+          <p>
+            Here&rsquo;s a simple program we might want to speed up:
+            <code>(add1 5)</code>
+          </p>
+
+          <p>
+            What program would we like to produce instead? Probably just
+            <code>6</code>.
+          </p>
+
+          <p>
+            So let&rsquo;s write the transformation that would handle exactly
+            this case. We&rsquo;ll write it in a separate
+            <code>constant_folding.ml</code> file, and then we&rsquo;ll call it
+            from the compiler before we start emitting assembly.
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 1: </span
+              ><code>constant_folding.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let rec fold : expr -&gt; expr = function
+  | Prim1 (Add1, Num n) -&gt; 
+      Num (n + 1) 
+  | e -&gt;
+      e
+</pre
+            >
+          </div>
+
+          <p>
+            Looks good! With this, we can successfully tackle
+            <code>(add1 5)</code>.
+          </p>
+
+          <p>
+            This means we&rsquo;ve successfully built an optimization! We
+            fulfilled criteria (1) preserves meaning and (2) improves some
+            programs.
+          </p>
+
+          <p>
+            But what about this program? <code>(add1 (add1 5))</code> This time
+            we&rsquo;ll try to match with the <code>Prim1</code> case, but since
+            <code>(add1 5)</code> is an expr, not a Num, we&rsquo;ll give up and
+            send back our original program, <code>(add1 (add1 5))</code>.
+          </p>
+
+          <p>Fortunately we can do better:</p>
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 2: </span
+              ><code>constant_folding.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let rec fold : expr -&gt; expr = function
+  | Prim1 (Add1, e) -&gt; (
+      let e = fold e in
+      match e with Num n -&gt; Num (n + 1) | _ -&gt; Prim1 (Add1, e) )
+  | e -&gt;
+      e
+</pre
+            >
+          </div>
+
+          <p>
+            Now we make a recursive call to <code>fold</code> once we&rsquo;ve
+            matched the outer <code>Add1</code>, so if we find we can reduce the
+            argument to a <code>Num</code>, we&rsquo;ll be able to reduce the
+            outer <code>Add1</code> as well. That&rsquo;s exactly what happens
+            with <code>(add1 (add1 5))</code>. We match the outer
+            <code>Add1</code>, make a recursive call on the inner
+            <code>Add1</code>, reduce that to <code>Num 6</code>, and then we
+            can reduce the outer <code>Add1</code> to <code>Num 7</code>.
+            Lovely.
+          </p>
+
+          <p>
+            But of course we&rsquo;re not done. What about
+            <code>(sub1 (add1 5))</code>? And what about
+            <code>(let ((x (add1 (add1 5)))) x)</code>?
+          </p>
+
+          <p>
+            Here&rsquo;s the implementation of constant folding once we&rsquo;ve
+            gone ahead and traversed more of the AST to catch cases like
+            <code>(let ((x (add1 (add1 5)))) x)</code>. We&rsquo;ve also added
+            support for finding constants that are constructed with
+            <code>Sub1</code> and <code>Plus</code>. We didn&rsquo;t bother to
+            flesh out quite everything. (E.g. there&rsquo;s no case for
+            <code>Sub</code>.) But this should give you enough context that you
+            could complete this compiler pass on your own.
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 3: </span
+              ><code>constant_folding.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let rec fold : expr -&gt; expr = function
+  | Num n -&gt;
+      Num n
+  | Prim1 (Add1, e) -&gt; (
+      let e = fold e in
+      match e with Num n -&gt; Num (n + 1) | _ -&gt; Prim1 (Add1, e) )
+  | Prim1 (Sub1, e) -&gt; (
+      let e = fold e in
+      match e with Num n -&gt; Num (n - 1) | _ -&gt; Prim1 (Sub1, e) )
+  | Prim1 (p, e) -&gt;
+      Prim1 (p, fold e)
+  | If (e1, e2, e3) -&gt;
+      If (fold e1, fold e2, fold e3)
+  | Prim2 (Plus, e1, e2) -&gt; (
+      let e1 = fold e1 in
+      let e2 = fold e2 in
+      match (e1, e2) with
+      | Num x, Num y -&gt;
+	  Num (x + y)
+      | _ -&gt;
+	  Prim2 (Plus, e1, e2) )
+  | Prim2 (p, e1, e2) -&gt;
+      Prim2 (p, fold e1, fold e2)
+  | Let (v, e, b) -&gt;
+      Let (v, fold e, fold b)
+  | e -&gt;
+      e
+
+let fold_program (prog : program) =
+  { body= fold prog.body
+  ; defns=
+      List.map
+	(fun {name; args; body} -&gt; {name; args; body= fold body})
+	prog.defns }
+</pre
+            >
+          </div>
+
+          <p>
+            And we can add this optimization pass to our compiler by adding the
+            call to <code>fold_program</code>:
+          </p>
+
+          <div class="org-src-container">
+            <label class="org-src-name"
+              ><span class="listing-number">Listing 4: </span
+              ><code>compile.ml</code></label
+            >
+            <pre class="src src-ocaml">
+let compile (program : s_exp list) : string =
+  let prog = program_of_s_exps program in
+  let prog = Constant_folding.fold_program prog in
+  [ Global "entry"
+  ; Extern "error"
+  ; Extern "read_num"
+  ; Extern "print_value"
+  ; Extern "print_newline"
+  ; Label "entry" ]
+  @ compile_exp prog.defns Symtab.empty (-8) prog.body true
+  @ [Ret]
+  @ (List.map (compile_defn prog.defns) prog.defns |&gt; List.concat)
+  |&gt; List.map string_of_directive
+  |&gt; String.concat "\n"
+</pre
+            >
+          </div>
+
+          <p>We can tell that our optimization is working:</p>
+
+          <div class="org-src-container">
+            <pre class="src src-ocaml">
+&gt; compile_and_run "(print (+ 2 (+ 3 (- 5 4))))"
+</pre
+            >
+          </div>
+
+          <p>Take a look at the assembly for this program!</p>
+
+          <p>
+            Our constant folding implementation above just tackles numbers, but
+            we could do the same thing with Booleans if we wanted!
+          </p>
+        </div>
+      </div>
+
+      <div id="outline-container-orgba70a3c" class="outline-2">
+        <h2 id="orgba70a3c">Discussion</h2>
+        <div class="outline-text-2" id="text-orgba70a3c">
+          <p>Some reflection questions:</p>
+
+          <p>
+            Q: What&rsquo;s the relationship between constant folding and
+            interpretation?
+          </p>
+
+          <p>
+            Q: What AST will we produce for
+            <code>(sub1 (add1 (add1 (read-num))))</code> ?
+          </p>
+
+          <p>
+            Q: Are we willing to trade off more time spent on compilation for
+            less time spent running the compiled program?
+          </p>
+        </div>
+
+        <div id="outline-container-org76a4661" class="outline-3">
+          <h3 id="org76a4661">Where can I learn more?</h3>
+          <div class="outline-text-3" id="text-org76a4661">
+            <p>
+              Optimization is a huge, huge area. If you take a grad compilers
+              course, solid chance you&rsquo;ll spend almost the entire course
+              on optimization, and you still won&rsquo;t have learned all there
+              is to know. Optimization is still an extremely active area of
+              research, and there&rsquo;s more happening in this area all the
+              time.
+            </p>
+
+            <p>
+              What we&rsquo;ll be learning in this class are some of the general
+              patterns, which will serve as a solid foundation if you want to
+              learn more optimization techniques going forward. Although we
+              won&rsquo;t be implementing any additional optimizations in our
+              in-class compiler, we <i>will</i> be seeing more in lecture, so
+              swing by class. And we&rsquo;ll also be implementing some
+              optimizations in the final homework of the semester.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="postamble" class="status">
+      <footer>
+        Content by Doug Woos, with modifications by Sarah E. Chasins<br />Style
+        adapted from
+        <a href="http://taopeng.me/org-notes-style/">org-notes-style</a>
+      </footer>
+    </div>
+  </body>
+</html>
