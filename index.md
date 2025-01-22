@@ -15,8 +15,8 @@ started:
 -   **Have a particular question in mind?** Check out the
     [FAQ]({{ site.baseurl }}{% link faq.md %}) or ask on Ed.
 -   **Need to submit some homework?** Do so on Gradescope.
-<!-- -   **Looking for the class compiler we build during class sessions?**
-    You can find it in the [Class Compiler GitHub Repository](#). -->
+-   **Looking for the class compiler we build during class sessions?**
+     You can find it in the [Class Compiler GitHub Repository](https://github.com/berkeley-cs164-sp25/class-compiler-sp25).
 
 ## Course Information
 
