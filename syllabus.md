@@ -474,7 +474,7 @@ Saturdays or Sundays.
 
 ### Office Hours {#Office_Hours}
 
-GSIs will offer office hours each week. Sarah will also have open office
+GSIs will offer office hours each week. The instructor will also have open office
 hours. Each week's schedule is available [here](./schedule.html). We may
 adjust the office hour schedule throughout the semester as we do
 mid-semester surveys to understand student needs and preferences!
@@ -484,8 +484,8 @@ signal that you are behind or need "extra help." On the contrary, coming
 to office hours early and often tends to co-occur with success in the
 course!
 
-Feel free to come to Sarah's office hours even if you don't have a
-specific question about an assignment. Sarah is happy to chat about the
+Feel free to come to office hours even if you don't have a
+specific question about an assignment. We are happy to chat about the
 course material, computer science in general, careers in computer
 science, or whatever other computer-y topics are on your mind.
 
