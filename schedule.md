@@ -7,20 +7,22 @@ title: Schedule
 Assignments (Drills and Homeworks) are **due at 9pm on the day listed**.
 
 - Week 0
-	- [What is a compiler?](./notes/00-What-Is-A-Compiler.html)
-	- [FP in OCaml §1.1–1.5](https://www.cs.cornell.edu/courses/cs3110/2019sp/textbook/intro/intro.html), [FP in OCaml §2.1–2.21](https://www.cs.cornell.edu/courses/cs3110/2019sp/textbook/intro/intro.html)
-	- [Activity 1 - OCaml](./activities/Activity-01.pdf)
-	<!-- - more ocaml -->
+	- Notes: [What is a compiler?](./notes/00-What-Is-A-Compiler.html)
+	- Resource: [FP in OCaml book ](https://cs3110.github.io/textbook/cover.html) 
+	- Activities: [1. OCaml](./activities/Activity-01.pdf), 
+	  [2. Course Goals](./activities/Activity-02.pdf), 
+	  [3. More OCaml](./activities/Activity-03.pdf)
+	- Section: [OCaml practice](https://classroom.github.com/a/dCqtSt5e)
 	- Tue, Jan 21
 	- Thu, Jan 23
 - Week 1
-	<!-- - sexprs -->
-	<!-- - unops -->
-	<!-- - correctness and testing -->
-	<!-- - booleans, interpreter -->
+	<!-- - [S-Expressions](./notes/01-S-Expressions.html) -->
+	<!-- - [Unary Ops](./notes/02-Unary.html)
+	- [Correctness and Testing](./notes/03-Correctness.html)
+	- [Booleans: Interpreter](./notes/04-Booleans-1.html) -->
 	- Tue, Jan 28
 	- Thu, Jan 30
-		- Homework 0
+		- [Homework 0](https://classroom.github.com/a/ciFgRAjw)
 		- Drill 1
 - Week 2
 	<!-- - booleans, compiler  -->
