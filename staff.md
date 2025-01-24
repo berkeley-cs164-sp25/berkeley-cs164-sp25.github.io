@@ -11,7 +11,7 @@ title: Staff
         <h1> <a href="https://www.mwillsey.com/">Max Willsey</a> </h1>
         <p class="info"><b>Pronouns:</b> he/him</p>
         <p class="info"><b>Role:</b> Instructor</p>
-        <p class="info"><b>Office Hours:</b> TBD </p>
+        <p class="info"><b>Office Hours:</b> Friday, 2-3pm, Soda 725 </p>
     </div>
 </div>
 
