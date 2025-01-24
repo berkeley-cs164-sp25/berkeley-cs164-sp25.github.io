@@ -29,7 +29,7 @@ title: Staff
     <div>
         <h1> <a href="">Sahil Bhatia</a> </h1>
         <p class="info"><b>Role:</b> GSI</p>
-        <p class="info"><b>Office Hours:</b> TBD </p>
+        <p class="info"><b>Office Hours:</b> Friday, 9-10am, Soda 511 </p>
     </div>
 </div>
 
