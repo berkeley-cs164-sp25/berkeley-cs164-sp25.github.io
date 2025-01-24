@@ -156,6 +156,8 @@ cat ~/.ssh/id_ed25519.pub | ssh cs164-???@cory.eecs.berkeley.edu 'cat >> ~/.ssh/
                 alt="Select SSH host in VSCode."
                 class="doc-screenshot"
               />
+        1. If you see an error about `powershell`,
+           try [this fix from StackOverflow](https://stackoverflow.com/questions/67016426/bash-powershell-command-not-found).
     5.  After a moment, you\'ll be in a new window. Make sure you\'re
         connected by checking the bottom left corner of the window:
         there should be a little green bar with the words \"SSH:
