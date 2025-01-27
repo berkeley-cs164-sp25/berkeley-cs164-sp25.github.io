@@ -16,11 +16,11 @@ title: Staff
 </div>
 
 <div class="profile">
-    <img src="" alt="Altan Haan"/>
+    <img src="/img/altan.jpg" alt="Altan Haan"/>
     <div>
         <h1> <a href="">Altan Haan</a> </h1>
         <p class="info"><b>Role:</b> Head GSI</p>
-        <p class="info"><b>Office Hours:</b> TBD </p>
+        <p class="info"><b>Office Hours:</b> Wednesday, 8-9pm, Soda 310 </p>
     </div>
 </div>
 
