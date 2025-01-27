@@ -16,7 +16,7 @@ title: Staff
 </div>
 
 <div class="profile">
-    <img src="/img/altan.jpg" alt="Altan Haan"/>
+    <img src="/img/altan.jpeg" alt="Altan Haan"/>
     <div>
         <h1> <a href="">Altan Haan</a> </h1>
         <p class="info"><b>Role:</b> Head GSI</p>
