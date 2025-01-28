@@ -23,7 +23,7 @@ Assignments (Drills and Homeworks) are **due at 9pm on the day listed**.
 	- Tue, Jan 28
 	- Thu, Jan 30
 		- [Homework 0](https://classroom.github.com/a/ciFgRAjw)
-		- Drill 1
+		- [Drill 1](https://bcourses.berkeley.edu/courses/1542169/quizzes/2494426)
 - Week 2
 	<!-- - booleans, compiler  -->
 	- Tue, Feb 4
