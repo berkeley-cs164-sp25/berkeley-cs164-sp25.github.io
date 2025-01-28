@@ -25,11 +25,11 @@ title: Staff
 </div>
 
 <div class="profile">
-    <img src="" alt="Sahil Bhatia"/>
+    <img src="/img/sahil.jpg" alt="Sahil Bhatia"/>
     <div>
         <h1> <a href="">Sahil Bhatia</a> </h1>
         <p class="info"><b>Role:</b> GSI</p>
-        <p class="info"><b>Office Hours:</b> Friday, 9-10am, Soda 511 </p>
+        <p class="info"><b>Office Hours:</b> Friday, 9-10am, Soda 347 </p>
     </div>
 </div>
 
