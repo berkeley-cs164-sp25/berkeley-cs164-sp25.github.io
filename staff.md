@@ -43,11 +43,11 @@ title: Staff
 </div>
 
 <div class="profile">
-    <img src="" alt="Jiwon Park"/>
+    <img src="/img/jiwon.JPG" alt="Jiwon Park"/>
     <div>
         <h1> <a href="">Jiwon Park</a> </h1>
         <p class="info"><b>Role:</b> GSI</p>
-        <p class="info"><b>Office Hours:</b> TBD </p>
+        <p class="info"><b>Office Hours:</b> Thursday, 9-10am, Soda 347 </p>
     </div>
 </div>
 
