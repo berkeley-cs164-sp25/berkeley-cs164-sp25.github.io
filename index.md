@@ -28,3 +28,9 @@ started:
 - **Prerequisites:**
     - [CS 61B. Data Structures](https://www2.eecs.berkeley.edu/Courses/CS61B/)
     - [CS 61C. Machine Structures](https://www2.eecs.berkeley.edu/Courses/CS61C/)
+- **Section**
+    - Section is optional, but very useful for hand-on practice! You may attend any section.
+    - Here are the regular rooms and times, see Ed for updates.
+    - **Section 1:** Tue 7pm-8pm, Cory 540 AB
+    - **Section 2:** Wed 11am-12pm, Soda 310
+    - **Section 3:** Wed 1pm-2pm, Dwinelle 79
