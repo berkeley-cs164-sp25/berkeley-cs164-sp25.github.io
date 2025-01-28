@@ -38,7 +38,7 @@ title: Staff
     <div>
         <h1> <a href="">Tyler Hou</a> </h1>
         <p class="info"><b>Role:</b> GSI</p>
-        <p class="info"><b>Office Hours:</b> TBD </p>
+        <p class="info"><b>Office Hours:</b> Thursday, 10-12am, Soda 411 </p>
     </div>
 </div>
 
