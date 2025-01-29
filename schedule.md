@@ -20,6 +20,7 @@ Assignments (Drills and Homeworks) are **due at 9pm on the day listed**.
 	<!-- - [Unary Ops](./notes/02-Unary.html) -->
 	<!-- - [Correctness and Testing](./notes/03-Correctness.html) -->
 	<!-- - [Booleans: Interpreter](./notes/04-Booleans-1.html) -->
+	- Section 2: [Ocaml Testing](https://classroom.github.com/a/KBvwYzUP)
 	- Tue, Jan 28
 	- Thu, Jan 30
 		- [Homework 0](https://classroom.github.com/a/ciFgRAjw)
