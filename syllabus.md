@@ -356,10 +356,10 @@ even if you\'re worried it won\'t be granted. Can\'t hurt to ask.
 **There are no extensions for exams or drills. Extensions are only for
 HWs.**
 
-### Anonymous Grading {#Anonymous_Grading}
+<!-- ### Non-Anonymous Grading {#Anonymous_Grading} -->
 
-All homeworks will be graded anonymously. Please do not include
-identifying information with your homework submission.
+<!-- All homeworks will be graded anonymously. Please do not include -->
+<!-- identifying information with your homework submission. -->
 
 ### Regrade Requests {#Regrade_Requests}
 
