@@ -34,7 +34,7 @@ Assignments (Drills and Homeworks) are **due at 9pm on the day listed**.
 	<!-- - binops,names -->
 	- Tue, Feb 11
 	- Thu, Feb 13
-		- Homework 1 🚩
+		- [Homework 1 🚩](https://classroom.github.com/a/DuvsVGLE)
 		- Drill 3
 - Week 4
 	<!-- - pairs, errors -->
