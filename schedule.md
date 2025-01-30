@@ -30,6 +30,7 @@ Assignments (Drills and Homeworks) are **due at 9pm on the day listed**.
 	- Tue, Feb 4
 	- Thu, Feb 6
 		- Drill 2
+	- Section 3. [Compiler Infrastructure and Testing](https://classroom.github.com/a/5MelbZP0)
 - Week 3
 	<!-- - binops,names -->
 	- Tue, Feb 11
