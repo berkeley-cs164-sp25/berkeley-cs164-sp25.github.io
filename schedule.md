@@ -27,10 +27,10 @@ Assignments (Drills and Homeworks) are **due at 9pm on the day listed**.
 		- [Drill 1](https://bcourses.berkeley.edu/courses/1542169/quizzes/2494426)
 - Week 2
 	<!-- - booleans, compiler  -->
+	- Section 3: [Compiler Infrastructure and Testing](https://classroom.github.com/a/5MelbZP0)
 	- Tue, Feb 4
 	- Thu, Feb 6
 		- Drill 2
-	- Section 3. [Compiler Infrastructure and Testing](https://classroom.github.com/a/5MelbZP0)
 - Week 3
 	<!-- - binops,names -->
 	- Tue, Feb 11
