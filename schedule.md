@@ -16,7 +16,7 @@ Assignments (Drills and Homeworks) are **due at 9pm on the day listed**.
 	- Tue, Jan 21
 	- Thu, Jan 23
 - Week 1
-	- [S-Expressions](./notes/01-S-Expressions.html) -->
+	- [S-Expressions](./notes/01-S-Expressions.html) 
 	- [Unary Ops](./notes/02-Unary.html)
 	<!-- - [Correctness and Testing](./notes/03-Correctness.html) -->
 	<!-- - [Booleans: Interpreter](./notes/04-Booleans-1.html) -->
