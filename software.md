@@ -35,11 +35,12 @@ bSecure VPN to access the instructional machines. You can find
 instructions for setting up the bSecure VPN
 [here](https://security.berkeley.edu/services/bsecure/bsecure-remote-access-vpn).
 
-*Tip:* If you ever get \"Connection refused\" or \"Connection timeout\"
+<!-- hive is now for 61c only -->
+<!-- *Tip:* If you ever get \"Connection refused\" or \"Connection timeout\"
 error while trying to connect to the instructional machines, check the
 status of the hive servers at
 [hivemind.eecs.berkeley.edu](https://hivemind.eecs.berkeley.edu/). All
-students have access to the following servers:
+students have access to the following servers: -->
 
 -   ashby.cs.berkeley.edu
 -   derby.cs.berkeley.edu
@@ -48,7 +49,7 @@ students have access to the following servers:
 -   gilman.cs.berkeley.edu
 -   oxford.cs.berkeley.edu
 -   solano.cs.berkeley.edu
--   hive‹n›.cs.berkeley.edu (where n is in the range 1-20, inclusive).
+<!-- -   hive‹n›.cs.berkeley.edu (where n is in the range 1-20, inclusive). -->
 
 1.  If you have not done so already, please create a [student
     instructional
