@@ -16,17 +16,15 @@ Assignments (Drills and Homeworks) are **due at 9pm on the day listed**.
 	- Tue, Jan 21
 	- Thu, Jan 23
 - Week 1
-	- [S-Expressions](./notes/01-S-Expressions.html) 
-	- [Unary Ops](./notes/02-Unary.html)
-	<!-- - [Correctness and Testing](./notes/03-Correctness.html) -->
-	<!-- - [Booleans: Interpreter](./notes/04-Booleans-1.html) -->
+	- Notes: [S-Expressions](./notes/01-S-Expressions.html), [Unary Ops](./notes/02-Unary.html)
 	- Section 2: [Ocaml Testing](https://classroom.github.com/a/KBvwYzUP)
 	- Tue, Jan 28
 	- Thu, Jan 30
 		- [Homework 0](https://classroom.github.com/a/ciFgRAjw)
 		- [Drill 1](https://bcourses.berkeley.edu/courses/1542169/quizzes/2494426)
 - Week 2
-	<!-- - booleans, compiler  -->
+	- Notes: [Correctness](./notes/03-Correctness.html), 
+	  Booleans in [Interpreter](./notes/04-Booleans-1.html) and [Compiler](./notes/05-Booleans-2.html)
 	- Section 3: [Compiler Infrastructure and Testing](https://classroom.github.com/a/5MelbZP0)
 	- Tue, Feb 4
 	- Thu, Feb 6
