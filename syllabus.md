@@ -237,7 +237,7 @@ us---and you!---understand which topics you've already understood vs.
 which topics we might need to cover more deeply in class.
 
 Drills will be graded for completion; you will get credit as long as you
-appear to be taking them seriously. You can miss one drill and still get
+appear to be taking them seriously. You can miss two drills and still get
 full credit for this part of the class.
 
 Extensions are not available for drills. We made this choice for a
@@ -249,7 +249,7 @@ class session content and section content in response to the confusions
 we see in drills, drill responses become much less useful for shaping
 the direction of the course if they come in late. So we don\'t do
 extensions for drills. But we totally understand that things come up! So
-we have the one-drill-gets-dropped rule (see above) to handle exactly
+we have the two-drills-gets-dropped rule (see above) to handle exactly
 that situation.
 
 We definitely recommend setting up a calendar reminder for drills, since
@@ -297,6 +297,10 @@ submit the HW. You do not need to email, fill in a form, or otherwise
 let us know if you want to take late days. Taking late days does not
 reduce the HW grade. Importantly, **all homeworks must be turned in before
 Monday of finals week, regardless of available late days.**
+
+If you exceed the total late days budget, 
+you will lose one percentage point of your course grade 
+for each additional late day used.
 
 If your assignment is handed in more than 72 hours after the original
 deadline and you have not been granted an extension (see below), your
