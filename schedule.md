@@ -33,6 +33,7 @@ Assignments (Drills and Homeworks) are **due at 9pm on the day listed**.
 	<!-- - binops,names -->
 	- Tue, Feb 11
 	- Thu, Feb 13
+	- Section 4: [Debugging Assembly](https://classroom.github.com/a/pNqcwhUk)
 		- [Homework 1 🚩](https://classroom.github.com/a/DuvsVGLE)
 		- Drill 3
 - Week 4
