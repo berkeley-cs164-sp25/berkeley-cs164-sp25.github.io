@@ -32,9 +32,9 @@ Assignments (Drills and Homeworks) are **due at 9pm on the day listed**.
 - Week 3
 	<!-- - binops,names -->
 	- Notes: [Booleans in Compiler](./notes/05-Booleans-2.html), [Conditionals](./notes/06-Conditionals.html).
+	- Section 4: [Debugging Assembly](https://classroom.github.com/a/pNqcwhUk)
 	- Tue, Feb 11
 	- Thu, Feb 13
-	- Section 4: [Debugging Assembly](https://classroom.github.com/a/pNqcwhUk)
 		- [Homework 1 🚩](https://classroom.github.com/a/DuvsVGLE)
 		- Drill 3
 - Week 4
