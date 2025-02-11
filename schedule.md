@@ -36,7 +36,7 @@ Assignments (Drills and Homeworks) are **due at 9pm on the day listed**.
 	- Tue, Feb 11
 	- Thu, Feb 13
 		- [Homework 1 🚩](https://classroom.github.com/a/DuvsVGLE)
-		- Drill 3
+		- [Drill 3](https://bcourses.berkeley.edu/courses/1542169/quizzes/2495605)
 - Week 4
 	<!-- - pairs, errors -->
 	- Tue, Feb 18
