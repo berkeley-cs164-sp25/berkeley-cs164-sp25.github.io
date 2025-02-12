@@ -32,5 +32,5 @@ started:
     - Section is optional, but very useful for hand-on practice! You may attend any section.
     - Here are the regular rooms and times, see Ed for updates.
     - **Jiwon's Section:** Tue 7pm-8pm, Cory 540 AB
-    - **Tyler's Section:** Wed 11:00am-11:45am, Soda 310 (starts at 11:00am, **not** Berkeley time)
+    - **Tyler's Section:** Wed 11am-12pm, Soda 310
     - **Sahil's Section:** Wed 1pm-2pm, Dwinelle 79
