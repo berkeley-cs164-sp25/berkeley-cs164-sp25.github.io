@@ -31,7 +31,9 @@ Assignments (Drills and Homeworks) are **due at 9pm on the day listed**.
 		- [Drill 2](https://bcourses.berkeley.edu/courses/1542169/quizzes/2494767)
 - Week 3
 	<!-- - binops,names -->
-	- Notes: [Booleans in Compiler](./notes/05-Booleans-2.html), [Conditionals](./notes/06-Conditionals.html).
+	- Notes: [Booleans in Compiler](./notes/05-Booleans-2.html), 
+	         [Conditionals](./notes/06-Conditionals.html),
+			 [Binary Ops](./notes/07-Binary_Operations.html)
 	- Section: Section 2/3 review
 	- Tue, Feb 11
 	- Thu, Feb 13
