@@ -1,7 +1,14 @@
 ---
 title: x86-64 Assembly Language Reference
-layout: page
+layout: default
 ---
+
+<style>
+    main table {
+        width: calc(100vw - 40px);
+        margin-left: calc(-50vw + 50% + 20px);
+    }
+</style>
 
 ## x86-64 assembly language reference
 
@@ -22,7 +29,7 @@ have provided to produce x86-64 instructions.
 
 The assembly programs produced by our compiler have the following form:
 
-``` asm
+```asm
 ;; frontmatter: global, etc.
 entry:
         ;; instructions
@@ -74,40 +81,39 @@ Don't worry about learning all of these instructions at once. It's ok to
 learn them as you need them for HWs and class sessions! Notes on some
 instructions are below, as indicated in the Notes column.
 
-| Directive | Example asm | Description | Notes |
-|----|----|----|----|
-| `Global of string` |  | Tells the assembler to export a label |  |
-| `global entry` |  |  |  |
-| `Section of string` | `section .text` | Writes to a segment in the generated binary |  |
-| `Label of string` | `label:` | Labels a program location |  |
-| `DqLabel of string` | `dq label1` | Writes the address of a particular label | <span class="spurious-link" target="*DqLabel">*DqLabel*</span> |
-| `LeaLabel of (operand * string)` | `lea rax, [label1]` | Loads a label's address into a register | <span class="spurious-link" target="*LeaLabel">*LeaLabel*</span> |
-| `Mov of (operand * operand)` | `mov rax, [rsp + -8]` | Moves data between locations |  |
-| `Add of (operand * operand)` | `add r8, rsp` | Adds its arguments, storing the result in the first one |  |
-| `Sub of (operand * operand)` | `sub rax, 4` | Subtracts its second argument from its first, storing the result in its first |  |
-| `Div of operand` | `idiv r8` | Divides the signed 128-bit integer `rdx:rax` by its argument, storing the result in `rax` | <span class="spurious-link" target="*Div and Mul">*Div and Mul*</span> |
-| `Mul of operand` | `imul [rsp + -8]` | Multiplies `rax` by its argument, storing the result in `rdx:rax` | <span class="spurious-link" target="*Div and Mul">*Div and Mul*</span> |
-| `Cqo` | `cqo` | Sign-extends `rax` into `rdx` |  |
-| `Shl of (operand * operand)` | `shl rax,2` | Shifts its first argument left by its second argument |  |
-| `Shr of (operand * operand)` | `shr rax,3` | Shifts its first argument right by its second argument, padding with zeroes on the left |  |
-| `Sar of (operand * operand)` | `sar rax,3` | Shifts its first argument right by its second argument, padding with zeroes or ones to maintain the sign | <span class="spurious-link" target="*Sar">*Sar*</span> |
-| `Cmp of (operand * operand)` | `cmp r8, [rsp + -16]` | Compares its two arguments, setting RFLAGS |  |
-| `And of (operand * operand)` | `and rax, r8` | Does a bitwise AND of its arguments, storing the result in its first argument |  |
-| `Or of (operand * operand)` | `or r8, 15` | Does a bitwise OR of its arguments, storing the result in its first argument |  |
-| `Setz of operand` | `setz al` | Sets its one-byte argument to the current value of `ZF` | <span class="spurious-link" target="*Setz">*Setz and al*</span> |
-| `Setl of operand` | `setl al` | Sets its one-byte argument to the current value of `(SF != OF)` | <span class="spurious-link" target="*Setl">*Setl*</span> |
-| `Jmp of string` | `jmp label1` | Jumps execution to the given label |  |
-| `Je of string` | `je label1` | Jumps execution to the given label if `ZF` is set | <span class="spurious-link" target="*Conditional jumps">*Jumps*</span> |
-| `Jne of string` | `jne label1` | Jumps execution to the given label if `ZF` is not set | <span class="spurious-link" target="*Conditional jumps">*Jumps*</span> |
-| `Jl of string` | `jl label1` | Jumps execution to the given label if `SF != OF` | <span class="spurious-link" target="*Conditional jumps">*Jumps*</span> |
-| `Jnl of string` | `jnl label1` | Jumps execution to the given label if `SF == OF` | <span class="spurious-link" target="*Conditional jumps">*Jumps*</span> |
-| `Jg of string` | `jg label1` | Jumps execution to the given label if `SF == OF AND !ZF` | <span class="spurious-link" target="*Conditional jumps">*Jumps*</span> |
-| `Jng of string` | `jng label1` | Jumps execution to the given label if `SF != OF OR ZF` | <span class="spurious-link" target="*Conditional jumps">*Jumps*</span> |
-| `ComputedJmp of operand` | `jmp rax` | Jumps to the location in the given operand |  |
-| `Ret` | `ret` | Returns control to the calling function |  |
-| `Comment of string` | `;; helpful comment` | A comment |  |
+| Directive                        | Example asm           | Description                                                                                              | Notes                                     |
+|----------------------------------|-----------------------|----------------------------------------------------------------------------------------------------------|-------------------------------------------|
+| `Global of string`               | `global entry`        | Tells the assembler to export a label                                                                    |                                           |
+| `Section of string`              | `section .text`       | Writes to a segment in the generated binary                                                              |                                           |
+| `Label of string`                | `label:`              | Labels a program location                                                                                |                                           |
+| `DqLabel of string`              | `dq label1`           | Writes the address of a particular label                                                                 | [*DqLabel*](#dq-label)                    |
+| `LeaLabel of (operand * string)` | `lea rax, [label1]`   | Loads a label's address into a register                                                                  | [*LeaLabel*](#lea-label)                  |
+| `Mov of (operand * operand)`     | `mov rax, [rsp + -8]` | Moves data between locations                                                                             |                                           |
+| `Add of (operand * operand)`     | `add r8, rsp`         | Adds its arguments, storing the result in the first one                                                  |                                           |
+| `Sub of (operand * operand)`     | `sub rax, 4`          | Subtracts its second argument from its first, storing the result in its first                            |                                           |
+| `Div of operand`                 | `idiv r8`             | Divides the signed 128-bit integer `rdx:rax` by its argument, storing the result in `rax`                | [*Div and Mul*](#div-mul)                 |
+| `Mul of operand`                 | `imul [rsp + -8]`     | Multiplies `rax` by its argument, storing the result in `rdx:rax`                                        | [*Div and Mul*](#div-mul)                 |
+| `Cqo`                            | `cqo`                 | Sign-extends `rax` into `rdx`                                                                            |                                           |
+| `Shl of (operand * operand)`     | `shl rax,2`           | Shifts its first argument left by its second argument                                                    |                                           |
+| `Shr of (operand * operand)`     | `shr rax,3`           | Shifts its first argument right by its second argument, padding with zeroes on the left                  |                                           |
+| `Sar of (operand * operand)`     | `sar rax,3`           | Shifts its first argument right by its second argument, padding with zeroes or ones to maintain the sign | [*Sar*](#sar)                             |
+| `Cmp of (operand * operand)`     | `cmp r8, [rsp + -16]` | Compares its two arguments, setting RFLAGS                                                               |                                           |
+| `And of (operand * operand)`     | `and rax, r8`         | Does a bitwise AND of its arguments, storing the result in its first argument                            |                                           |
+| `Or of (operand * operand)`      | `or r8, 15`           | Does a bitwise OR of its arguments, storing the result in its first argument                             |                                           |
+| `Setz of operand`                | `setz al`             | Sets its one-byte argument to the current value of `ZF`                                                  | [*Setz*](#setz)                           |
+| `Setl of operand`                | `setl al`             | Sets its one-byte argument to the current value of `(SF != OF)`                                          | [*Setl*](#setl)                           |
+| `Jmp of string`                  | `jmp label1`          | Jumps execution to the given label                                                                       |                                           |
+| `Je of string`                   | `je label1`           | Jumps execution to the given label if `ZF` is set                                                        | [*Conditional Jumps*](#conditional-jumps) |
+| `Jne of string`                  | `jne label1`          | Jumps execution to the given label if `ZF` is not set                                                    | [*Conditional Jumps*](#conditional-jumps) |
+| `Jl of string`                   | `jl label1`           | Jumps execution to the given label if `SF != OF`                                                         | [*Conditional Jumps*](#conditional-jumps) |
+| `Jnl of string`                  | `jnl label1`          | Jumps execution to the given label if `SF == OF`                                                         | [*Conditional Jumps*](#conditional-jumps) |
+| `Jg of string`                   | `jg label1`           | Jumps execution to the given label if `SF == OF AND !ZF`                                                 | [*Conditional Jumps*](#conditional-jumps) |
+| `Jng of string`                  | `jng label1`          | Jumps execution to the given label if `SF != OF OR ZF`                                                   | [*Conditional Jumps*](#conditional-jumps) |
+| `ComputedJmp of operand`         | `jmp rax`             | Jumps to the location in the given operand                                                               |                                           |
+| `Ret`                            | `ret`                 | Returns control to the calling function                                                                  |                                           |
+| `Comment of string`              | `;; helpful comment`  | A comment                                                                                                |                                           |
 
-1.  DqLabel
+1.  DqLabel <a id="dq-label"></a>
 
     `DqLabel "label1"` writes the address of the given label into the
     program as **data** (`dq` is short for “data, quad-word”). You can
@@ -115,14 +121,14 @@ instructions are below, as indicated in the Notes column.
     sure that your program's execution never gets to this directive–it's
     just data, not an instruction!
 
-2.  LeaLabel
+2.  LeaLabel <a id="lea-label"></a>
 
     `LeaLabel (Reg Rax, "label1")` loads the address of the given label
     into a register. You'll use this when doing a computed jump, or when
     trying to load data from a given label (e.g., in combination with
     `DqLabel`).
 
-3.  Div and Mul
+3.  Div and Mul <a id="div-mul"></a>
 
     `Div` and `Mul` work differently from `Add` and `Sub`. Because
     multiplying two 64-bit numbers will frequently overflow, the result
@@ -137,19 +143,19 @@ instructions are below, as indicated in the Notes column.
     Finally, neither `Div` nor `Mul` can take an immediate value as
     their argument–it needs to be either a register or a memory offset.
 
-4.  Sar
+4.  Sar <a id="sar"></a>
 
     `Sar` does an *arithmetic* right-shift, which maintains the sign of
     its argument while shifting it to right.
 
-5.  Setz
+5.  Setz <a id="setz"></a>
 
     `Setz(Reg Rax)` sets the last byte of `rax` to `0b00000001` if `ZF`
     is set and to `0b00000000` otherwise. In assembly it actually looks
     like `setz al`, because `al` is the name for the last byte of `rax`.
     The OCaml assembly library takes care of this for you.
 
-6.  Setl
+6.  Setl <a id="setl"></a>
 
     `setl` is short for “set if less.” Just as `Setz` sets its argument
     to 1 if the last `cmp` instruction compared equal arguments, `setl`
@@ -176,7 +182,7 @@ instructions are below, as indicated in the Notes column.
     Just do a `cmp` instruction and use the `set` (or `j`, see below)
     instruction with the right mnemonic.
 
-7.  Conditional jumps
+7.  Conditional jumps <a id="conditional-jumps"></a>
 
     `je` and friends jump to the specified label if their condition is
     true. The mnemonics work as explained above. For instance:

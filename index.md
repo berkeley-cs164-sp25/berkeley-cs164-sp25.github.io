@@ -34,3 +34,7 @@ started:
     - **Jiwon's Section:** Tue 7pm-8pm, Cory 540 AB
     - **Tyler's Section:** Wed 11am-12pm, Soda 310
     - **Sahil's Section:** Wed 1pm-2pm, Dwinelle 79
+
+## Additional Resources
+- [CS 3110 - OCaml Textbook](https://cs3110.github.io/textbook/cover.html)
+- [x86-64 Quick Reference](./md-notes/99-Assembly-Reference.html)
