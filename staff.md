@@ -2,6 +2,9 @@
 title: Staff
 ---
 
+**Office Hours**: 
+Office hours times/locations can be found on the [Ed post](https://edstem.org/us/courses/74529/discussion/6049997).
+
 # Staff
 
 <div class="profiles">
@@ -11,7 +14,6 @@ title: Staff
         <h1> <a href="https://www.mwillsey.com/">Max Willsey</a> </h1>
         <p class="info"><b>Pronouns:</b> he/him</p>
         <p class="info"><b>Role:</b> Instructor</p>
-        <p class="info"><b>Office Hours:</b> Friday, 2-3pm, Soda 725 </p>
     </div>
 </div>
 
@@ -20,7 +22,6 @@ title: Staff
     <div>
         <h1> <a href="">Altan Haan</a> </h1>
         <p class="info"><b>Role:</b> Head GSI</p>
-        <p class="info"><b>Office Hours:</b> Wednesday, 8-9pm, Soda 310 </p>
     </div>
 </div>
 
@@ -29,7 +30,6 @@ title: Staff
     <div>
         <h1> <a href="">Sahil Bhatia</a> </h1>
         <p class="info"><b>Role:</b> GSI</p>
-        <p class="info"><b>Office Hours:</b> Friday, 9-10am, Soda 347 </p>
     </div>
 </div>
 
@@ -38,7 +38,6 @@ title: Staff
     <div>
         <h1> <a href="">Tyler Hou</a> </h1>
         <p class="info"><b>Role:</b> GSI</p>
-        <p class="info"><b>Office Hours:</b> Thursday, 10-12am, Soda 411 </p>
     </div>
 </div>
 
@@ -47,7 +46,6 @@ title: Staff
     <div>
         <h1> <a href="">Jiwon Park</a> </h1>
         <p class="info"><b>Role:</b> GSI</p>
-        <p class="info"><b>Office Hours:</b> Thursday, 9-10am, Soda 347 </p>
     </div>
 </div>
 
