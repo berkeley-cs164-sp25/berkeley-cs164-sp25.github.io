@@ -58,7 +58,7 @@ Assignments (Drills and Homeworks) are **due at 9pm on the day listed**.
 	<!-- - functions -->
 	- Tue, Mar 4
 	- Thu, Mar 6
-		- Homework 3 🚩
+		- [Homework 3 🚩](https://classroom.github.com/a/UaqLfXT9)
 		- Drill 6
 - Week 7
 	<!-- - tco, parsing -->
