@@ -43,7 +43,7 @@ Assignments (Drills and Homeworks) are **due at 9pm on the day listed**.
 	<!-- - pairs, errors -->
 	- Notes: [Binary Ops](./notes/07-Binary_Operations.html),
 	         [Bad Behavior](./notes/08-Reflections_On_Binary_Operations.html),
-			 [Names 1](./notes/09-Naming_Expressions-1.html)
+			 Names ([1](./notes/09-Naming_Expressions-1.html), [2](./notes/10-Naming_Expressions-2.html))
 	- Section 4: [Debugging Assembly](https://classroom.github.com/a/pNqcwhUk)
 	- Tue, Feb 18
 	- Thu, Feb 20
