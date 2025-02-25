@@ -50,7 +50,7 @@ Assignments (Drills and Homeworks) are **due at 9pm on the day listed**.
 		- [Homework 2](https://classroom.github.com/a/PhQYwsrQ)
 		- [Drill 4](https://bcourses.berkeley.edu/courses/1542169/quizzes/2496045)
 - Week 5
-	- Notes: [Pairs](./notes/11-Pairs.html)
+	- Notes: [Pairs](./notes/11-Pairs.html), [Errors](./notes/12-Handling-Errors.html)
 	<!-- - io -->
 	- Tue, Feb 25
 	- Thu, Feb 27
