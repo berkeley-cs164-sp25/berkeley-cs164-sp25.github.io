@@ -59,6 +59,9 @@ Assignments (Drills and Homeworks) are **due at 9pm on the day listed**.
 		- [Drill 5](https://bcourses.berkeley.edu/courses/1542169/quizzes/2496313)
 - Week 6
 	<!-- - functions -->
+	- Notes: [Input](./notes/13-Interacting-With-Environment.html),
+	         [Output](./notes/14-Output.html),
+			 [Functions](./notes/15-Functions.html)
 	- Tue, Mar 4
 	- Thu, Mar 6
 		- [Homework 3 🚩](https://classroom.github.com/a/UaqLfXT9)
