@@ -65,7 +65,7 @@ Assignments (Drills and Homeworks) are **due at 9pm on the day listed**.
 	- Tue, Mar 4
 	- Thu, Mar 6
 		- [Homework 3 🚩](https://classroom.github.com/a/UaqLfXT9)
-		- Drill 6
+		- [Drill 6](https://bcourses.berkeley.edu/courses/1542169/quizzes/2496597)
 - Week 7
 	<!-- - tco, parsing -->
 	- Tue, Mar 11
