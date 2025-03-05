@@ -62,6 +62,7 @@ Assignments (Drills and Homeworks) are **due at 9pm on the day listed**.
 	- Notes: [Input](./notes/13-Interacting-With-Environment.html),
 	         [Output](./notes/14-Output.html),
 			 [Functions](./notes/15-Functions.html)
+	- Section 6: [How do you refer to the heap?](https://classroom.github.com/a/-Fs3_kEW)
 	- Tue, Mar 4
 	- Thu, Mar 6
 		- [Homework 3 🚩](https://classroom.github.com/a/UaqLfXT9)
