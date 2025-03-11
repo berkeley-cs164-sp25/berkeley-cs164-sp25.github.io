@@ -69,6 +69,8 @@ Assignments (Drills and Homeworks) are **due at 9pm on the day listed**.
 		- [Drill 6](https://bcourses.berkeley.edu/courses/1542169/quizzes/2496597)
 - Week 7
 	<!-- - tco, parsing -->
+	- Notes: [Functions](./notes/15-Functions.html),
+	         [Tail Calls](./notes/16-Tail-Call.html)
 	- Tue, Mar 11
 	- Thu, Mar 13
 		- [Homework 4](https://classroom.github.com/a/EFulzFxJ)
