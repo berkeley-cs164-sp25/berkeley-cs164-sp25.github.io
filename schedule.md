@@ -79,7 +79,7 @@ Assignments (Drills and Homeworks) are **due at 9pm on the day listed**.
 	- Tue, Mar 18
 		- **MIDTERM** in class
 	- Thu, Mar 20
-		- [Homework 5](https://classroom.github.com/a/SMlyqQxJ)
+		- [Homework 5](https://classroom.github.com/a/SMlyqQxJ) (extended to Mar 23)
 		- Drill 8
 - Week 9: **Spring Break**
 	- Tue, Mar 25
