@@ -88,7 +88,7 @@ Assignments (Drills and Homeworks) are **due at 9pm on the day listed**.
 	<!-- - parsing / function pointers  -->
 	- Tue, Apr 1
 	- Thu, Apr 3
-		- Homework 6 🚩
+		- [Homework 6 🚩](https://classroom.github.com/a/TQhNSGFx)
 - Week 11
 	<!-- - lambdas -->
 	- Tue, Apr 8
