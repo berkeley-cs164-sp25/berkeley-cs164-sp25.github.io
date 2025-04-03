@@ -95,7 +95,7 @@ Assignments (Drills and Homeworks) are **due at 9pm on the day listed**.
 	<!-- - lambdas -->
 	- Tue, Apr 8
 	- Thu, Apr 10
-		- Homework 7
+		- [Homework 7](https://classroom.github.com/a/M41S0BF4)
 		- Drill 9
 - Week 12
 	<!-- - opts -->
