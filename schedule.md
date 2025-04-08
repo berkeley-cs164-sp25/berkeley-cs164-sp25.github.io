@@ -87,12 +87,13 @@ Assignments (Drills and Homeworks) are **due at 9pm on the day listed**.
 - Week 10
 	<!-- - parsing / function pointers  -->
 	- Notes: [Parsing](./notes/17-Parsing-1.html),
-	         [Regex Activity](./activities/regularExpressionsActivity.txt),
+	         [Regex Activity](./activities/regularExpressionsActivity.txt)
 	- Tue, Apr 1
 	- Thu, Apr 3
 		- [Homework 6 🚩](https://classroom.github.com/a/TQhNSGFx)
 - Week 11
 	<!-- - lambdas -->
+	- Notes: Parsing (cont'd)
 	- Tue, Apr 8
 	- Thu, Apr 10
 		- [Homework 7](https://classroom.github.com/a/M41S0BF4)
