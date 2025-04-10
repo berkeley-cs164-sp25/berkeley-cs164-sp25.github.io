@@ -94,7 +94,7 @@ Assignments (Drills and Homeworks) are **due at 9pm on the day listed**.
 		- [Homework 6 🚩](https://classroom.github.com/a/TQhNSGFx)
 - Week 11
 	<!-- - lambdas -->
-	- Notes: Parsing (cont'd)
+	- Notes: Parsing (cont'd), [Optimization](./notes/20-Optimization.html)
 	- Tue, Apr 8
 	- Thu, Apr 10
 		- [Homework 7](https://classroom.github.com/a/M41S0BF4)
