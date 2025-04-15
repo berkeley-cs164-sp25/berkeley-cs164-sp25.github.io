@@ -101,7 +101,7 @@ Assignments (Drills and Homeworks) are **due at 9pm on the day listed**.
 - Week 12
 	<!-- - opts -->
 	- Notes: [Optimization](./notes/20-Optimization.html),
-	         [First-class Functions 1](./notes/18-First-Class-Functions-Function-Pointers.html)
+	         First-class Functions ([part 1](./notes/18-First-Class-Functions-Function-Pointers.html), [part 2](./notes/19-First-Class-Functions-Lambdas.html))
 	- Tue, Apr 15
 	- Thu, Apr 17
 		- [Homework 8 part 1](https://classroom.github.com/a/Qbc9gK2z)
