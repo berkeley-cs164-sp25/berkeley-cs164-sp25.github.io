@@ -93,7 +93,6 @@ Assignments (Drills and Homeworks) are **due at 9pm on the day listed**.
 	- Thu, Apr 3
 		- [Homework 6 🚩](https://classroom.github.com/a/TQhNSGFx)
 - Week 11
-	<!-- - lambdas -->
 	- Notes: Parsing (cont'd), [Optimization](./notes/20-Optimization.html)
 	- Tue, Apr 8
 	- Thu, Apr 10
@@ -101,6 +100,8 @@ Assignments (Drills and Homeworks) are **due at 9pm on the day listed**.
 		- [Drill 9](https://bcourses.berkeley.edu/courses/1542169/quizzes/2498534)
 - Week 12
 	<!-- - opts -->
+	- Notes: [Optimization](./notes/20-Optimization.html),
+	         [First-class Functions 1](./notes/18-First-Class-Functions-Function-Pointers.html)
 	- Tue, Apr 15
 	- Thu, Apr 17
 		- Homework 8 part 1
