@@ -104,8 +104,8 @@ Assignments (Drills and Homeworks) are **due at 9pm on the day listed**.
 	         [First-class Functions 1](./notes/18-First-Class-Functions-Function-Pointers.html)
 	- Tue, Apr 15
 	- Thu, Apr 17
-		- Homework 8 part 1
-		- Drill 10
+		- [Homework 8 part 1](https://classroom.github.com/a/Qbc9gK2z)
+		- [Drill 10](https://bcourses.berkeley.edu/courses/1542169/quizzes/2499102)
 - Week 13
 	<!-- - gc -->
 	- Tue, Apr 22
@@ -115,7 +115,7 @@ Assignments (Drills and Homeworks) are **due at 9pm on the day listed**.
 	<!-- - types, trusting trust -->
 	- Tue, Apr 29
 	- Thu, May 1
-		- Homework 8 🚩
+		- [Homework 8 🚩](https://classroom.github.com/a/Qbc9gK2z)
 - **RRR Week**
 	- Tue, May 6
 	- Thu, May 8
