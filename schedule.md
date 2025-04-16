@@ -102,6 +102,7 @@ Assignments (Drills and Homeworks) are **due at 9pm on the day listed**.
 	<!-- - opts -->
 	- Notes: [Optimization](./notes/20-Optimization.html),
 	         First-class Functions ([part 1](./notes/18-First-Class-Functions-Function-Pointers.html), [part 2](./notes/19-First-Class-Functions-Lambdas.html))
+	- Section 8: [Compiler Optimization](https://docs.google.com/presentation/d/1Bgs-Qva1EkUXed3wRir4SDvyRNePpmdOtpfh5c-GYno/edit?usp=sharing)
 	- Tue, Apr 15
 	- Thu, Apr 17
 		- [Homework 8 part 1](https://classroom.github.com/a/Qbc9gK2z)
