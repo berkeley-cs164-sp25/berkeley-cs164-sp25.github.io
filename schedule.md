@@ -111,7 +111,7 @@ Assignments (Drills and Homeworks) are **due at 9pm on the day listed**.
 	<!-- - gc -->
 	- Tue, Apr 22
 	- Thu, Apr 24
-		- Drill 11
+		- [Drill 11](https://bcourses.berkeley.edu/courses/1542169/quizzes/2499341)
 - Week 14
 	<!-- - types, trusting trust -->
 	- Tue, Apr 29
