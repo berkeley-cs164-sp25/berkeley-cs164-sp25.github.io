@@ -109,6 +109,8 @@ Assignments (Drills and Homeworks) are **due at 9pm on the day listed**.
 		- [Drill 10](https://bcourses.berkeley.edu/courses/1542169/quizzes/2499102)
 - Week 13
 	<!-- - gc -->
+	- Notes: First-class Functions [part 2](./notes/19-First-Class-Functions-Lambdas.html),
+	         Types ([activity](./activities/Type_Checking_Activity.pdf))
 	- Section 9: [First-Class Functions](https://docs.google.com/document/d/1CUzrySyiw06fWg7wYlZ3lwxLEykQa_uIDPN2u9H6viU/edit?usp=sharing)
 	- Tue, Apr 22
 	- Thu, Apr 24
