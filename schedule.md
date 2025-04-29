@@ -117,6 +117,10 @@ Assignments (Drills and Homeworks) are **due at 9pm on the day listed**.
 		- [Drill 11](https://bcourses.berkeley.edu/courses/1542169/quizzes/2499341)
 - Week 14
 	<!-- - types, trusting trust -->
+	- Lecture: Types, IRs, 
+      Register Allocation ([activity](./activities/registerAllocationActivity.pdf)),
+      Garbage Collection ([activity](./activities/GC_Activity.pdf)),
+	  Trusting Trust ([short paper](./activities/Thompson_1984_ReflectionsonTrustingTrust.pdf), pls read for Thu)
 	- Tue, Apr 29
 	- Thu, May 1
 		- [Homework 8 🚩](https://classroom.github.com/a/Qbc9gK2z)
